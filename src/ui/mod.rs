@@ -1,60 +1,185 @@
 pub mod functions;
 pub mod menus;
 
-use fltk::enums::Shortcut;
-use fltk::menu::{MenuBar, MenuFlag};
-use fltk::prelude::{MenuExt, WidgetBase, WidgetExt};
-use fltk::window::Window;
+use std::collections::HashMap;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 
-pub fn build_menu(win: &mut Window) {
-    let mut menubar = MenuBar::new(0, 0, win.w(), 30, "");
+use eframe::egui::{self, Ui};
+use eframe::CreationContext;
+use egui_dock::tab_viewer::OnCloseResponse;
+use egui_dock::{DockArea, DockState, NodeIndex, Style};
 
-    menubar.add(
-        "File/New Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::new_project(),
-    );
-    menubar.add(
-        "File/Open Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::open_project(),
-    );
-    menubar.add(
-        "File/Save Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::save_project(),
-    );
-    menubar.add(
-        "File/Export Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::export_project(),
-    );
-    menubar.add(
-        "File/Quit\t",
-        Shortcut::Ctrl | 'q',
-        MenuFlag::Normal,
-        |_| std::process::exit(0),
-    );
+use crate::ui::menus::viewport_3d::Viewport3DState;
 
-    menubar.add(
-        "View/3D View\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::open_3d_view(),
-    );
-    menubar.add(
-        "View/Tools\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| menus::tools_menu::show(),
-    );
+pub enum Command {
+    AddViewport,
+}
 
-    win.resize_callback(move |w, _, _, w_w, _h| {
-        menubar.set_size(w_w, 30);
-        w.redraw();
-    });
+#[derive(Debug, Clone, PartialEq)]
+enum Tab {
+    Viewport3D(usize),
+    SceneGraph,
+    Properties,
+    Console,
+}
+
+pub struct EditorApp {
+    dock_state: DockState<Tab>,
+    command_sender: Sender<Command>,
+    command_receiver: Receiver<Command>,
+    gl: Option<Arc<glow::Context>>,
+    viewports: HashMap<usize, Viewport3DState>,
+    next_viewport_id: usize,
+    tabs_to_remove: Vec<usize>,
+}
+
+impl EditorApp {
+    pub fn new(cc: &CreationContext<'_>) -> Self {
+        let (tx, rx) = mpsc::channel();
+        let gl = cc.gl.as_ref().map(|gl| gl.clone());
+
+        let mut dock_state = DockState::new(vec![Tab::SceneGraph]);
+        let tree = dock_state.main_surface_mut();
+        tree.split_right(
+            NodeIndex::root(),
+            0.75,
+            vec![Tab::Properties, Tab::Console],
+        );
+
+        Self {
+            dock_state,
+            command_sender: tx,
+            command_receiver: rx,
+            gl,
+            viewports: HashMap::new(),
+            next_viewport_id: 0,
+            tabs_to_remove: Vec::new(),
+        }
+    }
+}
+
+impl eframe::App for EditorApp {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        self.process_commands();
+
+        for id in self.tabs_to_remove.drain(..) {
+            self.viewports.remove(&id);
+        }
+
+        let ctx = ui.ctx().clone();
+
+        egui::Panel::top("menu_bar").show_inside(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("New Project").clicked() {
+                        ui.close();
+                        functions::new_project();
+                    }
+                    if ui.button("Open Project").clicked() {
+                        ui.close();
+                        functions::open_project();
+                    }
+                    if ui.button("Save Project").clicked() {
+                        ui.close();
+                        functions::save_project();
+                    }
+                    if ui.button("Export Project").clicked() {
+                        ui.close();
+                        functions::export_project();
+                    }
+                });
+                ui.menu_button("View", |ui| {
+                    if ui.button("3D View").clicked() {
+                        ui.close();
+                        functions::open_3d_view(&self.command_sender);
+                    }
+                    if ui.button("Tools").clicked() {
+                        ui.close();
+                        functions::tools_menu();
+                    }
+                });
+            });
+        });
+
+        let viewports = &mut self.viewports;
+        let gl = &self.gl;
+        let tabs_to_remove = &mut self.tabs_to_remove;
+        let mut tab_viewer = TabViewer {
+            gl,
+            viewports,
+            tabs_to_remove,
+        };
+
+        DockArea::new(&mut self.dock_state)
+            .style(Style::from_egui(ctx.global_style().as_ref()))
+            .show_inside(ui, &mut tab_viewer);
+    }
+}
+
+impl EditorApp {
+    fn process_commands(&mut self) {
+        while let Ok(cmd) = self.command_receiver.try_recv() {
+            match cmd {
+                Command::AddViewport => {
+                    let gl = self.gl.as_ref().expect("No GL context").clone();
+                    let id = self.next_viewport_id;
+                    self.next_viewport_id += 1;
+                    self.viewports.insert(
+                        id,
+                        Viewport3DState::new(&gl),
+                    );
+                    self.dock_state
+                        .push_to_focused_leaf(Tab::Viewport3D(id));
+                }
+            }
+        }
+    }
+}
+
+struct TabViewer<'a> {
+    gl: &'a Option<Arc<glow::Context>>,
+    viewports: &'a mut HashMap<usize, Viewport3DState>,
+    tabs_to_remove: &'a mut Vec<usize>,
+}
+
+impl<'a> egui_dock::TabViewer for TabViewer<'a> {
+    type Tab = Tab;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        match tab {
+            Tab::Viewport3D(id) => format!("3D Viewport {}", id).into(),
+            Tab::SceneGraph => "Scene Graph".into(),
+            Tab::Properties => "Properties".into(),
+            Tab::Console => "Console".into(),
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        match tab {
+            Tab::Viewport3D(id) => {
+                if let Some(state) = self.viewports.get_mut(id) {
+                    if let Some(gl) = self.gl.as_ref() {
+                        state.ui(ui, gl);
+                    }
+                }
+            }
+            Tab::SceneGraph => {
+                ui.label("Scene Graph");
+            }
+            Tab::Properties => {
+                ui.label("Properties");
+            }
+            Tab::Console => {
+                ui.label("Console");
+            }
+        }
+    }
+
+    fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
+        if let Tab::Viewport3D(id) = tab {
+            self.tabs_to_remove.push(*id);
+        }
+        OnCloseResponse::Close
+    }
 }
