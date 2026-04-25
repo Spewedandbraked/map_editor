@@ -123,46 +123,50 @@ impl Viewport3DState {
         let shift = input.modifiers.shift;
         let ctrl = input.modifiers.ctrl;
 
-        if !mb_middle {
-            self.last_mmb_pos = None;
-        }
-
-        if let Some(pos) = mouse_pos {
-            if let Some(last_pos) = self.last_mmb_pos {
-                let delta = pos - last_pos;
-                let sensitivity = 0.003;
-
-                if ctrl {
-                    self.camera_distance *= 1.0 - delta.y * sensitivity;
-                    self.camera_distance = self.camera_distance.max(0.01);
-                } else if shift {
-                    let right = self.camera_rotation * Vec3::X;
-                    let up = self.camera_rotation * Vec3::Y;
-                    self.camera_target -= right * delta.x * sensitivity * self.camera_distance;
-                    self.camera_target += up * delta.y * sensitivity * self.camera_distance;
-                } else {
-                    let yaw_rot = Quat::from_rotation_y(delta.x * sensitivity);
-                    let pitch_rot = Quat::from_rotation_x(delta.y * sensitivity);
-                    self.camera_rotation = (yaw_rot * self.camera_rotation * pitch_rot).normalize();
-                }
-            }
-            if mb_middle {
-                self.last_mmb_pos = Some(pos);
-            }
-        }
-
+        let mut do_rotate = false;
         if mb_right {
+            do_rotate = true;
+        } else if mb_middle && !shift && !ctrl {
+            do_rotate = true;
+        }
+
+        if do_rotate {
             if let Some(pos) = mouse_pos {
                 if let Some(last_pos) = self.last_mouse_pos {
                     let delta = pos - last_pos;
-                    let yaw_rot = Quat::from_rotation_y(delta.x * 0.003);
-                    let pitch_rot = Quat::from_rotation_x(delta.y * 0.003);
+                    const ROTATE_SENSITIVITY: f32 = 0.003;
+                    let yaw_rot = Quat::from_rotation_y(delta.x * ROTATE_SENSITIVITY);
+                    let pitch_rot = Quat::from_rotation_x(delta.y * ROTATE_SENSITIVITY);
                     self.camera_rotation = (yaw_rot * self.camera_rotation * pitch_rot).normalize();
                 }
                 self.last_mouse_pos = Some(pos);
             }
         } else {
             self.last_mouse_pos = None;
+        }
+
+        if !mb_middle {
+            self.last_mmb_pos = None;
+        }
+
+        if mb_middle && (shift || ctrl) {
+            if let Some(pos) = mouse_pos {
+                if let Some(last_pos) = self.last_mmb_pos {
+                    let delta = pos - last_pos;
+                    let sensitivity = 0.003;
+                    if ctrl {
+                        self.camera_distance *= 1.0 - delta.y * sensitivity;
+                        self.camera_distance = self.camera_distance.max(0.01);
+                    } else if shift {
+                        let right = self.camera_rotation * Vec3::X;
+                        let up = self.camera_rotation * Vec3::Y;
+                        self.camera_target -= right * delta.x * sensitivity * self.camera_distance;
+                        self.camera_target += up * delta.y * sensitivity * self.camera_distance;
+                    }
+                }
+
+                self.last_mmb_pos = Some(pos);
+            }
         }
 
         let keys_down = &input.keys_down;
