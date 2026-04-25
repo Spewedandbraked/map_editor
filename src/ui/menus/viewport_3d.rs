@@ -192,7 +192,7 @@ impl Viewport3DState {
 
         let scroll = input.smooth_scroll_delta.y;
         if scroll != 0.0 {
-            self.camera_distance *= 1.0 - scroll * 0.05;
+            self.camera_distance *= 1.0 - scroll * 0.01;
             self.camera_distance = self.camera_distance.max(0.01);
         }
     }
