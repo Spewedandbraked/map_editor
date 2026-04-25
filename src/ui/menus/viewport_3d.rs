@@ -4,37 +4,135 @@ use eframe::egui;
 use glam::{Mat4, Quat, Vec3};
 use glow::HasContext;
 
-pub struct Viewport3DState {
-    // gl: Arc<glow::Context>,
-    size: [i32; 2],
-    camera_rotation: Quat,
-    camera_distance: f32,
-    camera_target: Vec3,
-    last_mouse_pos: Option<egui::Pos2>,
-    last_mmb_pos: Option<egui::Pos2>,
+const ROTATE_SENSITIVITY: f32 = 0.003;
+const PAN_SENSITIVITY: f32 = 0.003;
+const ZOOM_SENSITIVITY: f32 = 0.01;
+const SCROLL_SENSITIVITY: f32 = 0.01;
+const MOVE_SPEED: f32 = 0.1;
+
+struct Camera {
+    rotation: Quat,
+    distance: f32,
+    target: Vec3,
+}
+
+impl Camera {
+    fn new() -> Self {
+        Self {
+            rotation: Quat::IDENTITY,
+            distance: 5.0,
+            target: Vec3::ZERO,
+        }
+    }
+
+    fn forward(&self) -> Vec3 {
+        self.rotation * Vec3::Z
+    }
+
+    fn right(&self) -> Vec3 {
+        self.rotation * Vec3::X
+    }
+
+    fn up(&self) -> Vec3 {
+        self.rotation * Vec3::Y
+    }
+
+    fn position(&self) -> Vec3 {
+        self.target + self.rotation * Vec3::new(0.0, 0.0, self.distance)
+    }
+
+    fn view_matrix(&self) -> Mat4 {
+        Mat4::look_at_rh(self.position(), self.target, self.up())
+    }
+
+    fn rotate(&mut self, delta_x: f32, delta_y: f32) {
+        let yaw = Quat::from_rotation_y(delta_x * ROTATE_SENSITIVITY);
+        let pitch = Quat::from_rotation_x(delta_y * ROTATE_SENSITIVITY);
+        self.rotation = (yaw * self.rotation * pitch).normalize();
+    }
+
+    fn pan(&mut self, delta_x: f32, delta_y: f32) {
+        let right = self.right();
+        let up = self.up();
+        self.target -= right * delta_x * PAN_SENSITIVITY * self.distance;
+        self.target += up * delta_y * PAN_SENSITIVITY * self.distance;
+    }
+
+    fn zoom_distance(&mut self, factor: f32) {
+        self.distance *= 1.0 - factor * ZOOM_SENSITIVITY;
+        self.distance = self.distance.max(0.01);
+    }
+
+    fn apply_scroll(&mut self, scroll: f32) {
+        self.distance *= 1.0 - scroll * SCROLL_SENSITIVITY;
+        self.distance = self.distance.max(0.01);
+    }
+}
+
+struct Renderer {
     program: glow::Program,
     vao: glow::VertexArray,
-    // vbo: glow::Buffer,
     vertex_count: i32,
+}
+
+impl Renderer {
+    fn new(gl: &glow::Context) -> Self {
+        let program = create_shader_program(gl);
+        let (vao, vertex_count) = create_grid_geometry(gl);
+
+        Self {
+            program,
+            vao,
+            vertex_count,
+        }
+    }
+
+    fn render(&self, gl: &glow::Context, camera: &Camera, size: [i32; 2]) {
+        unsafe {
+            gl.enable(glow::DEPTH_TEST);
+            gl.clear_color(0.2, 0.2, 0.2, 1.0);
+            gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+            gl.use_program(Some(self.program));
+
+            let view = camera.view_matrix();
+            let proj = Mat4::perspective_rh(
+                60.0f32.to_radians(),
+                size[0] as f32 / size[1] as f32,
+                0.1,
+                100.0,
+            );
+            let mvp = proj * view;
+
+            gl.uniform_matrix_4_f32_slice(
+                gl.get_uniform_location(self.program, "u_mvp").as_ref(),
+                false,
+                &mvp.to_cols_array(),
+            );
+
+            gl.bind_vertex_array(Some(self.vao));
+            gl.draw_arrays(glow::LINES, 0, self.vertex_count);
+
+            gl.disable(glow::DEPTH_TEST);
+        }
+    }
+}
+
+pub struct Viewport3DState {
+    camera: Camera,
+    renderer: Renderer,
+    size: [i32; 2],
+    last_mouse_pos: Option<egui::Pos2>,
+    last_mmb_pos: Option<egui::Pos2>,
 }
 
 impl Viewport3DState {
     pub fn new(gl: &Arc<glow::Context>) -> Self {
-        let program = create_shader_program(gl);
-        let (vao, _vbo, vertex_count) = create_grid_geometry(gl);
-
         Self {
-            // gl: Arc::clone(gl),
+            camera: Camera::new(),
+            renderer: Renderer::new(gl),
             size: [512, 512],
-            camera_rotation: Quat::IDENTITY,
-            camera_distance: 5.0,
-            camera_target: Vec3::ZERO,
             last_mouse_pos: None,
             last_mmb_pos: None,
-            program,
-            vao,
-            // vbo,
-            vertex_count,
         }
     }
 
@@ -53,15 +151,13 @@ impl Viewport3DState {
             egui::Sense::click_and_drag(),
         );
 
-        let rotation = self.camera_rotation;
-        let distance = self.camera_distance;
-        let target = self.camera_target;
+        let program = self.renderer.program;
+        let vao = self.renderer.vao;
+        let vertex_count = self.renderer.vertex_count;
+        let rotation = self.camera.rotation;
+        let distance = self.camera.distance;
+        let target = self.camera.target;
         let size = self.size;
-        let program = self.program;
-        let vao = self.vao;
-        // let vbo = self.vbo;
-        let vertex_count = self.vertex_count;
-        // let gl = Arc::clone(&self.gl);
 
         let cb = egui::PaintCallback {
             rect,
@@ -73,9 +169,7 @@ impl Viewport3DState {
                     gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
                     gl.use_program(Some(program));
 
-                    let offset = rotation * Vec3::new(0.0, 0.0, distance);
-                    let camera_pos = target + offset;
-
+                    let camera_pos = target + rotation * Vec3::new(0.0, 0.0, distance);
                     let up = rotation * Vec3::Y;
                     let view = Mat4::look_at_rh(camera_pos, target, up);
                     let proj = Mat4::perspective_rh(
@@ -123,21 +217,13 @@ impl Viewport3DState {
         let shift = input.modifiers.shift;
         let ctrl = input.modifiers.ctrl;
 
-        let mut do_rotate = false;
-        if mb_right {
-            do_rotate = true;
-        } else if mb_middle && !shift && !ctrl {
-            do_rotate = true;
-        }
+        let rotate = mb_right || (mb_middle && !shift && !ctrl);
 
-        if do_rotate {
+        if rotate {
             if let Some(pos) = mouse_pos {
                 if let Some(last_pos) = self.last_mouse_pos {
                     let delta = pos - last_pos;
-                    const ROTATE_SENSITIVITY: f32 = 0.003;
-                    let yaw_rot = Quat::from_rotation_y(delta.x * ROTATE_SENSITIVITY);
-                    let pitch_rot = Quat::from_rotation_x(delta.y * ROTATE_SENSITIVITY);
-                    self.camera_rotation = (yaw_rot * self.camera_rotation * pitch_rot).normalize();
+                    self.camera.rotate(delta.x, delta.y);
                 }
                 self.last_mouse_pos = Some(pos);
             }
@@ -153,49 +239,33 @@ impl Viewport3DState {
             if let Some(pos) = mouse_pos {
                 if let Some(last_pos) = self.last_mmb_pos {
                     let delta = pos - last_pos;
-                    let sensitivity = 0.003;
                     if ctrl {
-                        self.camera_distance *= 1.0 - delta.y * sensitivity;
-                        self.camera_distance = self.camera_distance.max(0.01);
+                        self.camera.zoom_distance(delta.y);
                     } else if shift {
-                        let right = self.camera_rotation * Vec3::X;
-                        let up = self.camera_rotation * Vec3::Y;
-                        self.camera_target -= right * delta.x * sensitivity * self.camera_distance;
-                        self.camera_target += up * delta.y * sensitivity * self.camera_distance;
+                        self.camera.pan(delta.x, delta.y);
                     }
                 }
-
                 self.last_mmb_pos = Some(pos);
             }
         }
 
         let keys_down = &input.keys_down;
-
-        let forward = self.camera_rotation * Vec3::Z;
-        let right = self.camera_rotation * Vec3::X;
+        let forward = self.camera.forward();
+        let right = self.camera.right();
 
         let mut move_dir = Vec3::ZERO;
-        if keys_down.contains(&egui::Key::W) {
-            move_dir -= forward;
-        }
-        if keys_down.contains(&egui::Key::S) {
-            move_dir += forward;
-        }
-        if keys_down.contains(&egui::Key::A) {
-            move_dir -= right;
-        }
-        if keys_down.contains(&egui::Key::D) {
-            move_dir += right;
-        }
+        if keys_down.contains(&egui::Key::W) { move_dir -= forward; }
+        if keys_down.contains(&egui::Key::S) { move_dir += forward; }
+        if keys_down.contains(&egui::Key::A) { move_dir -= right; }
+        if keys_down.contains(&egui::Key::D) { move_dir += right; }
         if move_dir.length_squared() > 0.0 {
             move_dir = move_dir.normalize();
-            self.camera_target += move_dir * 0.1;
+            self.camera.target += move_dir * MOVE_SPEED;
         }
 
         let scroll = input.smooth_scroll_delta.y;
         if scroll != 0.0 {
-            self.camera_distance *= 1.0 - scroll * 0.01;
-            self.camera_distance = self.camera_distance.max(0.01);
+            self.camera.apply_scroll(scroll);
         }
     }
 }
@@ -233,7 +303,7 @@ fn create_shader_program(gl: &glow::Context) -> glow::Program {
     }
 }
 
-fn create_grid_geometry(gl: &glow::Context) -> (glow::VertexArray, glow::Buffer, i32) {
+fn create_grid_geometry(gl: &glow::Context) -> (glow::VertexArray, i32) {
     let mut vertices: Vec<f32> = Vec::new();
     let grid_size = 10;
     for i in -grid_size..=grid_size {
@@ -247,14 +317,10 @@ fn create_grid_geometry(gl: &glow::Context) -> (glow::VertexArray, glow::Buffer,
         let vbo = gl.create_buffer().unwrap();
         gl.bind_vertex_array(Some(vao));
         gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-        gl.buffer_data_u8_slice(
-            glow::ARRAY_BUFFER,
-            bytemuck::cast_slice(&vertices),
-            glow::STATIC_DRAW,
-        );
+        gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&vertices), glow::STATIC_DRAW);
         gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, 12, 0);
         gl.enable_vertex_attrib_array(0);
         gl.bind_vertex_array(None);
-        (vao, vbo, vertex_count)
+        (vao, vertex_count)
     }
 }
