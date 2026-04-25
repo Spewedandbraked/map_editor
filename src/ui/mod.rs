@@ -1,60 +1,109 @@
 pub mod functions;
-pub mod menus;
 
-use fltk::enums::Shortcut;
-use fltk::menu::{MenuBar, MenuFlag};
-use fltk::prelude::{MenuExt, WidgetBase, WidgetExt};
-use fltk::window::Window;
+use eframe::egui::{self, Ui};
+use egui_dock::{DockArea, DockState, NodeIndex, Style};
 
-pub fn build_menu(win: &mut Window) {
-    let mut menubar = MenuBar::new(0, 0, win.w(), 30, "");
+pub struct EditorApp {
+    dock_state: DockState<Tab>,
+}
 
-    menubar.add(
-        "File/New Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::new_project(),
-    );
-    menubar.add(
-        "File/Open Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::open_project(),
-    );
-    menubar.add(
-        "File/Save Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::save_project(),
-    );
-    menubar.add(
-        "File/Export Project\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::export_project(),
-    );
-    menubar.add(
-        "File/Quit\t",
-        Shortcut::Ctrl | 'q',
-        MenuFlag::Normal,
-        |_| std::process::exit(0),
-    );
+#[derive(Debug, Clone, PartialEq)]
+enum Tab {
+    Viewport3D,
+    SceneGraph,
+    Properties,
+    Console,
+}
 
-    menubar.add(
-        "View/3D View\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| functions::open_3d_view(),
-    );
-    menubar.add(
-        "View/Tools\t",
-        Shortcut::None,
-        MenuFlag::Normal,
-        |_| menus::tools_menu::show(),
-    );
+impl EditorApp {
+    pub fn new() -> Self {
+        let mut dock_state = DockState::new(vec![
+            Tab::Viewport3D,
+            Tab::SceneGraph,
+        ]);
 
-    win.resize_callback(move |w, _, _, w_w, _h| {
-        menubar.set_size(w_w, 30);
-        w.redraw();
-    });
+        let tree = dock_state.main_surface_mut();
+        tree.split_right(
+            NodeIndex::root(),
+            0.75,
+            vec![Tab::Properties, Tab::Console],
+        );
+
+        Self { dock_state }
+    }
+}
+
+impl eframe::App for EditorApp {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
+
+        egui::Panel::top("menu_bar").show_inside(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("New Project").clicked() {
+                        ui.close();
+                        functions::new_project();
+                    }
+                    if ui.button("Open Project").clicked() {
+                        ui.close();
+                        functions::open_project();
+                    }
+                    if ui.button("Save Project").clicked() {
+                        ui.close();
+                        functions::save_project();
+                    }
+                    if ui.button("Export Project").clicked() {
+                        ui.close();
+                        functions::export_project();
+                    }
+                });
+                ui.menu_button("View", |ui| {
+                    if ui.button("3D View").clicked() {
+                        ui.close();
+                        functions::open_3d_view();
+                    }
+                    if ui.button("Tools").clicked() {
+                        ui.close();
+                        functions::tools_menu();
+                    }
+                });
+            });
+        });
+
+        DockArea::new(&mut self.dock_state)
+            .style(Style::from_egui(ctx.global_style().as_ref()))
+            .show_inside(ui, &mut TabViewer {});
+    }
+}
+
+struct TabViewer;
+
+impl egui_dock::TabViewer for TabViewer {
+    type Tab = Tab;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        match tab {
+            Tab::Viewport3D => "3D Viewport".into(),
+            Tab::SceneGraph => "Scene Graph".into(),
+            Tab::Properties => "Properties".into(),
+            Tab::Console => "Console".into(),
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        match tab {
+            Tab::Viewport3D => {
+                ui.label("3D Viewport - will be rendered here");
+            }
+            Tab::SceneGraph => {
+                ui.label("Scene Graph");
+            }
+            Tab::Properties => {
+                ui.label("Properties");
+            }
+            Tab::Console => {
+                ui.label("Console");
+            }
+        }
+    }
 }
