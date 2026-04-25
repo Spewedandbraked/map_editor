@@ -5,7 +5,7 @@ use glam::{Mat4, Quat, Vec3};
 use glow::HasContext;
 
 pub struct Viewport3DState {
-    gl: Arc<glow::Context>,
+    // gl: Arc<glow::Context>,
     size: [i32; 2],
     camera_rotation: Quat,
     camera_distance: f32,
@@ -14,29 +14,27 @@ pub struct Viewport3DState {
     last_mmb_pos: Option<egui::Pos2>,
     program: glow::Program,
     vao: glow::VertexArray,
-    vbo: glow::Buffer,
+    // vbo: glow::Buffer,
     vertex_count: i32,
 }
 
 impl Viewport3DState {
     pub fn new(gl: &Arc<glow::Context>) -> Self {
-        unsafe {
-            let program = create_shader_program(gl);
-            let (vao, vbo, vertex_count) = create_grid_geometry(gl);
+        let program = create_shader_program(gl);
+        let (vao, _vbo, vertex_count) = create_grid_geometry(gl);
 
-            Self {
-                gl: Arc::clone(gl),
-                size: [512, 512],
-                camera_rotation: Quat::IDENTITY,
-                camera_distance: 5.0,
-                camera_target: Vec3::ZERO,
-                last_mouse_pos: None,
-                last_mmb_pos: None,
-                program,
-                vao,
-                vbo,
-                vertex_count,
-            }
+        Self {
+            // gl: Arc::clone(gl),
+            size: [512, 512],
+            camera_rotation: Quat::IDENTITY,
+            camera_distance: 5.0,
+            camera_target: Vec3::ZERO,
+            last_mouse_pos: None,
+            last_mmb_pos: None,
+            program,
+            vao,
+            // vbo,
+            vertex_count,
         }
     }
 
@@ -61,9 +59,9 @@ impl Viewport3DState {
         let size = self.size;
         let program = self.program;
         let vao = self.vao;
-        let vbo = self.vbo;
+        // let vbo = self.vbo;
         let vertex_count = self.vertex_count;
-        let gl = Arc::clone(&self.gl);
+        // let gl = Arc::clone(&self.gl);
 
         let cb = egui::PaintCallback {
             rect,
@@ -132,7 +130,7 @@ impl Viewport3DState {
         if let Some(pos) = mouse_pos {
             if let Some(last_pos) = self.last_mmb_pos {
                 let delta = pos - last_pos;
-                let sensitivity = 0.01;
+                let sensitivity = 0.003;
 
                 if ctrl {
                     self.camera_distance *= 1.0 - delta.y * sensitivity;
@@ -157,8 +155,8 @@ impl Viewport3DState {
             if let Some(pos) = mouse_pos {
                 if let Some(last_pos) = self.last_mouse_pos {
                     let delta = pos - last_pos;
-                    let yaw_rot = Quat::from_rotation_y(delta.x * 0.01);
-                    let pitch_rot = Quat::from_rotation_x(delta.y * 0.01);
+                    let yaw_rot = Quat::from_rotation_y(delta.x * 0.003);
+                    let pitch_rot = Quat::from_rotation_x(delta.y * 0.003);
                     self.camera_rotation = (yaw_rot * self.camera_rotation * pitch_rot).normalize();
                 }
                 self.last_mouse_pos = Some(pos);
