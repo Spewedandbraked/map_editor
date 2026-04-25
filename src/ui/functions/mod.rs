@@ -1,21 +1,11 @@
-use fltk::dialog;
+pub mod new_project;
+pub mod open_project;
+pub mod save_project;
+pub mod export_project;
+pub mod open_3d_view;
 
-pub fn new_project() {
-    println!("нажата функция New Project");
-    dialog::message_default("Новый проект создан");
-}
-
-pub fn open_project() {
-    println!("нажата функция Open Project");
-    dialog::message_default("Проект открыт");
-}
-
-pub fn save_project() {
-    println!("нажата функция Save Project");
-    dialog::message_default("Проект сохранён");
-}
-
-pub fn export_project() {
-    println!("нажата функция Export Project");
-    dialog::message_default("Проект экспортирован");
-}
+pub use new_project::new_project;
+pub use open_project::open_project;
+pub use save_project::save_project;
+pub use export_project::export_project;
+pub use open_3d_view::open_3d_view;

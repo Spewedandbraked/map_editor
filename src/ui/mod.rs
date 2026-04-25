@@ -7,20 +7,16 @@ use fltk::prelude::{MenuExt, WidgetBase, WidgetExt};
 use fltk::window::Window;
 
 pub fn build_menu(win: &mut Window, mut gl_win: fltk::window::GlWindow) {
+    gl_win.hide();
+
     let mut menubar = MenuBar::new(0, 0, win.w(), 30, "");
 
+    let gl_new = gl_win.clone();
     menubar.add(
         "File/New Project\t",
         Shortcut::None,
         MenuFlag::Normal,
-        {
-            let mut gl = gl_win.clone();
-            move |_| {
-                functions::new_project();
-                gl.show();
-                gl.redraw();
-            }
-        },
+        move |_| functions::new_project(gl_new.clone()),
     );
     menubar.add(
         "File/Open Project\t",
@@ -47,17 +43,12 @@ pub fn build_menu(win: &mut Window, mut gl_win: fltk::window::GlWindow) {
         |_| std::process::exit(0),
     );
 
+    let gl_view = gl_win.clone();
     menubar.add(
         "View/3D View\t",
         Shortcut::None,
         MenuFlag::Normal,
-        {
-            let mut gl = gl_win.clone();
-            move |_| {
-                gl.show();
-                gl.redraw();
-            }
-        },
+        move |_| functions::open_3d_view(gl_view.clone()),
     );
     menubar.add(
         "View/Tools\t",
@@ -66,9 +57,8 @@ pub fn build_menu(win: &mut Window, mut gl_win: fltk::window::GlWindow) {
         |_| menus::tools_menu::show(),
     );
 
-    win.resize_callback(move |w, _, _, w_w, h| {
+    win.resize_callback(move |w, _, _, w_w, _h| {
         menubar.set_size(w_w, 30);
-        gl_win.set_size(w_w, h - 30);
         w.redraw();
     });
 }
