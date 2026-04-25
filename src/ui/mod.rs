@@ -6,17 +6,14 @@ use fltk::menu::{MenuBar, MenuFlag};
 use fltk::prelude::{MenuExt, WidgetBase, WidgetExt};
 use fltk::window::Window;
 
-pub fn build_menu(win: &mut Window, mut gl_win: fltk::window::GlWindow) {
-    gl_win.hide();
-
+pub fn build_menu(win: &mut Window) {
     let mut menubar = MenuBar::new(0, 0, win.w(), 30, "");
 
-    let gl_new = gl_win.clone();
     menubar.add(
         "File/New Project\t",
         Shortcut::None,
         MenuFlag::Normal,
-        move |_| functions::new_project(gl_new.clone()),
+        |_| functions::new_project(),
     );
     menubar.add(
         "File/Open Project\t",
@@ -43,12 +40,11 @@ pub fn build_menu(win: &mut Window, mut gl_win: fltk::window::GlWindow) {
         |_| std::process::exit(0),
     );
 
-    let gl_view = gl_win.clone();
     menubar.add(
         "View/3D View\t",
         Shortcut::None,
         MenuFlag::Normal,
-        move |_| functions::open_3d_view(gl_view.clone()),
+        |_| functions::open_3d_view(),
     );
     menubar.add(
         "View/Tools\t",

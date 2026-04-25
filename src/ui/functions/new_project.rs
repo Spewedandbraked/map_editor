@@ -1,5 +1,8 @@
-use fltk::prelude::WidgetExt;
+use fltk::prelude::{GroupExt, WidgetBase, WidgetExt};
+use fltk::window::GlutWindow;
 
-pub fn new_project(mut gl: fltk::window::GlWindow) {
-    println!("нажата функция Open Project");
+pub fn new_project() {
+    let mut gl = GlutWindow::new(0, 30, 1280, 690, "");
+    gl.end();
+    gl.show();
 }

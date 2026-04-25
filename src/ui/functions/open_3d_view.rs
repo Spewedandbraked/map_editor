@@ -1,5 +1,8 @@
-use fltk::prelude::WidgetExt;
+use fltk::prelude::{GroupExt, WidgetBase, WidgetExt};
+use fltk::window::GlutWindow;
 
-pub fn open_3d_view(mut gl: fltk::window::GlWindow) {
+pub fn open_3d_view() {
+    let mut gl = GlutWindow::new(0, 30, 1280, 690, "");
+    gl.end();
     gl.show();
 }
