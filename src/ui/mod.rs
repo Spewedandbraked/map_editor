@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use eframe::egui::{self, Ui};
 use eframe::CreationContext;
+use egui_dock::tab_viewer::OnCloseResponse;
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 
 use crate::ui::menus::viewport_3d::Viewport3DState;
@@ -30,6 +31,7 @@ pub struct EditorApp {
     gl: Option<Arc<glow::Context>>,
     viewports: HashMap<usize, Viewport3DState>,
     next_viewport_id: usize,
+    tabs_to_remove: Vec<usize>,
 }
 
 impl EditorApp {
@@ -52,6 +54,7 @@ impl EditorApp {
             gl,
             viewports: HashMap::new(),
             next_viewport_id: 0,
+            tabs_to_remove: Vec::new(),
         }
     }
 }
@@ -59,6 +62,10 @@ impl EditorApp {
 impl eframe::App for EditorApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         self.process_commands();
+
+        for id in self.tabs_to_remove.drain(..) {
+            self.viewports.remove(&id);
+        }
 
         let ctx = ui.ctx().clone();
 
@@ -97,7 +104,12 @@ impl eframe::App for EditorApp {
 
         let viewports = &mut self.viewports;
         let gl = &self.gl;
-        let mut tab_viewer = TabViewer { gl, viewports };
+        let tabs_to_remove = &mut self.tabs_to_remove;
+        let mut tab_viewer = TabViewer {
+            gl,
+            viewports,
+            tabs_to_remove,
+        };
 
         DockArea::new(&mut self.dock_state)
             .style(Style::from_egui(ctx.global_style().as_ref()))
@@ -128,6 +140,7 @@ impl EditorApp {
 struct TabViewer<'a> {
     gl: &'a Option<Arc<glow::Context>>,
     viewports: &'a mut HashMap<usize, Viewport3DState>,
+    tabs_to_remove: &'a mut Vec<usize>,
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
@@ -161,5 +174,12 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                 ui.label("Console");
             }
         }
+    }
+
+    fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
+        if let Tab::Viewport3D(id) = tab {
+            self.tabs_to_remove.push(*id);
+        }
+        OnCloseResponse::Close
     }
 }
