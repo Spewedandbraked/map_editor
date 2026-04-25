@@ -1,0 +1,9 @@
+[package]
+name = "map_editor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fltk = { version = "1.5", features = ["enable-glwindow"] }
+gl = "0.14"
+glm = "0.2"
