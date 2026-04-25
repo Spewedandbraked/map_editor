@@ -37,13 +37,13 @@ impl Camera {
         self.rotation * Vec3::Y
     }
 
-    fn position(&self) -> Vec3 {
-        self.target + self.rotation * Vec3::new(0.0, 0.0, self.distance)
-    }
+    // fn position(&self) -> Vec3 {
+    //     self.target + self.rotation * Vec3::new(0.0, 0.0, self.distance)
+    // }
 
-    fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at_rh(self.position(), self.target, self.up())
-    }
+    // fn view_matrix(&self) -> Mat4 {
+    //     Mat4::look_at_rh(self.position(), self.target, self.up())
+    // }
 
     fn rotate(&mut self, delta_x: f32, delta_y: f32) {
         let yaw = Quat::from_rotation_y(delta_x * ROTATE_SENSITIVITY);
@@ -87,34 +87,34 @@ impl Renderer {
         }
     }
 
-    fn render(&self, gl: &glow::Context, camera: &Camera, size: [i32; 2]) {
-        unsafe {
-            gl.enable(glow::DEPTH_TEST);
-            gl.clear_color(0.2, 0.2, 0.2, 1.0);
-            gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
-            gl.use_program(Some(self.program));
+    // fn render(&self, gl: &glow::Context, camera: &Camera, size: [i32; 2]) {
+    //     unsafe {
+    //         gl.enable(glow::DEPTH_TEST);
+    //         gl.clear_color(0.2, 0.2, 0.2, 1.0);
+    //         gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+    //         gl.use_program(Some(self.program));
 
-            let view = camera.view_matrix();
-            let proj = Mat4::perspective_rh(
-                60.0f32.to_radians(),
-                size[0] as f32 / size[1] as f32,
-                0.1,
-                100.0,
-            );
-            let mvp = proj * view;
+    //         let view = camera.view_matrix();
+    //         let proj = Mat4::perspective_rh(
+    //             60.0f32.to_radians(),
+    //             size[0] as f32 / size[1] as f32,
+    //             0.1,
+    //             100.0,
+    //         );
+    //         let mvp = proj * view;
 
-            gl.uniform_matrix_4_f32_slice(
-                gl.get_uniform_location(self.program, "u_mvp").as_ref(),
-                false,
-                &mvp.to_cols_array(),
-            );
+    //         gl.uniform_matrix_4_f32_slice(
+    //             gl.get_uniform_location(self.program, "u_mvp").as_ref(),
+    //             false,
+    //             &mvp.to_cols_array(),
+    //         );
 
-            gl.bind_vertex_array(Some(self.vao));
-            gl.draw_arrays(glow::LINES, 0, self.vertex_count);
+    //         gl.bind_vertex_array(Some(self.vao));
+    //         gl.draw_arrays(glow::LINES, 0, self.vertex_count);
 
-            gl.disable(glow::DEPTH_TEST);
-        }
-    }
+    //         gl.disable(glow::DEPTH_TEST);
+    //     }
+    // }
 }
 
 pub struct Viewport3DState {
