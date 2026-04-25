@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use eframe::egui;
+use glam::{Mat4, Quat, Vec3};
 use glow::HasContext;
-use glam::{Mat4, Vec3};
 
 pub struct Viewport3DState {
     gl: Arc<glow::Context>,
     size: [i32; 2],
-    camera_yaw: f32,
-    camera_pitch: f32,
+    camera_rotation: Quat,
     camera_distance: f32,
     camera_target: Vec3,
     last_mouse_pos: Option<egui::Pos2>,
+    last_mmb_pos: Option<egui::Pos2>,
     program: glow::Program,
     vao: glow::VertexArray,
     vbo: glow::Buffer,
@@ -27,11 +27,11 @@ impl Viewport3DState {
             Self {
                 gl: Arc::clone(gl),
                 size: [512, 512],
-                camera_yaw: 0.0,
-                camera_pitch: 0.5,
+                camera_rotation: Quat::IDENTITY,
                 camera_distance: 5.0,
                 camera_target: Vec3::ZERO,
                 last_mouse_pos: None,
+                last_mmb_pos: None,
                 program,
                 vao,
                 vbo,
@@ -55,8 +55,7 @@ impl Viewport3DState {
             egui::Sense::click_and_drag(),
         );
 
-        let yaw = self.camera_yaw;
-        let pitch = self.camera_pitch;
+        let rotation = self.camera_rotation;
         let distance = self.camera_distance;
         let target = self.camera_target;
         let size = self.size;
@@ -68,48 +67,42 @@ impl Viewport3DState {
 
         let cb = egui::PaintCallback {
             rect,
-            callback: std::sync::Arc::new(egui_glow::CallbackFn::new(
-                move |_info, painter| {
-                    let gl = painter.gl();
-                    unsafe {
-                        gl.enable(glow::DEPTH_TEST);
-                        gl.clear_color(0.2, 0.2, 0.2, 1.0);
-                        gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
-                        gl.use_program(Some(program));
+            callback: std::sync::Arc::new(egui_glow::CallbackFn::new(move |_info, painter| {
+                let gl = painter.gl();
+                unsafe {
+                    gl.enable(glow::DEPTH_TEST);
+                    gl.clear_color(0.2, 0.2, 0.2, 1.0);
+                    gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+                    gl.use_program(Some(program));
 
-                        let camera_pos = target
-                            + Vec3::new(
-                                yaw.sin() * distance,
-                                pitch.sin() * distance,
-                                -yaw.cos() * distance,
-                            );
+                    let offset = rotation * Vec3::new(0.0, 0.0, distance);
+                    let camera_pos = target + offset;
 
-                        let view = Mat4::look_at_rh(camera_pos, target, Vec3::Y);
-                        let proj = Mat4::perspective_rh(
-                            60.0f32.to_radians(),
-                            size[0] as f32 / size[1] as f32,
-                            0.1,
-                            100.0,
-                        );
-                        let mvp = proj * view;
+                    let up = rotation * Vec3::Y;
+                    let view = Mat4::look_at_rh(camera_pos, target, up);
+                    let proj = Mat4::perspective_rh(
+                        60.0f32.to_radians(),
+                        size[0] as f32 / size[1] as f32,
+                        0.1,
+                        100.0,
+                    );
+                    let mvp = proj * view;
 
-                        gl.uniform_matrix_4_f32_slice(
-                            gl.get_uniform_location(program, "u_mvp").as_ref(),
-                            false,
-                            &mvp.to_cols_array(),
-                        );
+                    gl.uniform_matrix_4_f32_slice(
+                        gl.get_uniform_location(program, "u_mvp").as_ref(),
+                        false,
+                        &mvp.to_cols_array(),
+                    );
 
-                        gl.bind_vertex_array(Some(vao));
-                        gl.draw_arrays(glow::LINES, 0, vertex_count);
+                    gl.bind_vertex_array(Some(vao));
+                    gl.draw_arrays(glow::LINES, 0, vertex_count);
 
-                        gl.disable(glow::DEPTH_TEST);
-                    }
-                },
-            )),
+                    gl.disable(glow::DEPTH_TEST);
+                }
+            })),
         };
 
         ui.painter().add(cb);
-
         ui.ctx().request_repaint();
     }
 
@@ -123,18 +116,50 @@ impl Viewport3DState {
 
         if !mouse_over {
             self.last_mouse_pos = None;
+            self.last_mmb_pos = None;
             return;
         }
 
-        let mouse_down = input.pointer.button_down(egui::PointerButton::Secondary);
+        let mb_middle = input.pointer.button_down(egui::PointerButton::Middle);
+        let mb_right = input.pointer.button_down(egui::PointerButton::Secondary);
+        let shift = input.modifiers.shift;
+        let ctrl = input.modifiers.ctrl;
 
-        if mouse_down {
+        if !mb_middle {
+            self.last_mmb_pos = None;
+        }
+
+        if let Some(pos) = mouse_pos {
+            if let Some(last_pos) = self.last_mmb_pos {
+                let delta = pos - last_pos;
+                let sensitivity = 0.01;
+
+                if ctrl {
+                    self.camera_distance *= 1.0 - delta.y * sensitivity;
+                    self.camera_distance = self.camera_distance.max(0.01);
+                } else if shift {
+                    let right = self.camera_rotation * Vec3::X;
+                    let up = self.camera_rotation * Vec3::Y;
+                    self.camera_target -= right * delta.x * sensitivity * self.camera_distance;
+                    self.camera_target += up * delta.y * sensitivity * self.camera_distance;
+                } else {
+                    let yaw_rot = Quat::from_rotation_y(delta.x * sensitivity);
+                    let pitch_rot = Quat::from_rotation_x(delta.y * sensitivity);
+                    self.camera_rotation = (yaw_rot * self.camera_rotation * pitch_rot).normalize();
+                }
+            }
+            if mb_middle {
+                self.last_mmb_pos = Some(pos);
+            }
+        }
+
+        if mb_right {
             if let Some(pos) = mouse_pos {
                 if let Some(last_pos) = self.last_mouse_pos {
                     let delta = pos - last_pos;
-                    self.camera_yaw += delta.x * 0.01;
-                    self.camera_pitch += delta.y * 0.01;
-                    self.camera_pitch = self.camera_pitch.clamp(0.01, 1.5);
+                    let yaw_rot = Quat::from_rotation_y(delta.x * 0.01);
+                    let pitch_rot = Quat::from_rotation_x(delta.y * 0.01);
+                    self.camera_rotation = (yaw_rot * self.camera_rotation * pitch_rot).normalize();
                 }
                 self.last_mouse_pos = Some(pos);
             }
@@ -144,18 +169,22 @@ impl Viewport3DState {
 
         let keys_down = &input.keys_down;
 
-        let forward = Vec3::new(
-            self.camera_yaw.sin() * self.camera_pitch.cos(),
-            self.camera_pitch.sin(),
-            -self.camera_yaw.cos() * self.camera_pitch.cos(),
-        );
-        let right = Vec3::new(forward.z, 0.0, -forward.x).normalize();
+        let forward = self.camera_rotation * Vec3::Z;
+        let right = self.camera_rotation * Vec3::X;
 
         let mut move_dir = Vec3::ZERO;
-        if keys_down.contains(&egui::Key::W) { move_dir -= forward; }
-        if keys_down.contains(&egui::Key::S) { move_dir += forward; }
-        if keys_down.contains(&egui::Key::A) { move_dir -= right; }
-        if keys_down.contains(&egui::Key::D) { move_dir += right; }
+        if keys_down.contains(&egui::Key::W) {
+            move_dir -= forward;
+        }
+        if keys_down.contains(&egui::Key::S) {
+            move_dir += forward;
+        }
+        if keys_down.contains(&egui::Key::A) {
+            move_dir -= right;
+        }
+        if keys_down.contains(&egui::Key::D) {
+            move_dir += right;
+        }
         if move_dir.length_squared() > 0.0 {
             move_dir = move_dir.normalize();
             self.camera_target += move_dir * 0.1;
@@ -163,7 +192,8 @@ impl Viewport3DState {
 
         let scroll = input.smooth_scroll_delta.y;
         if scroll != 0.0 {
-            self.camera_distance = (self.camera_distance - scroll * 0.1).max(0.1);
+            self.camera_distance *= 1.0 - scroll * 0.05;
+            self.camera_distance = self.camera_distance.max(0.01);
         }
     }
 }
