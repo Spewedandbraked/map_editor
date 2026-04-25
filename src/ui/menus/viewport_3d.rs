@@ -109,6 +109,8 @@ impl Viewport3DState {
         };
 
         ui.painter().add(cb);
+
+        ui.ctx().request_repaint();
     }
 
     fn handle_input(&mut self, ui: &mut egui::Ui) {
@@ -116,24 +118,31 @@ impl Viewport3DState {
         let input = ctx.input(|i| i.clone());
         let rect = ui.available_rect_before_wrap();
 
-        let mouse_down = input.pointer.button_down(egui::PointerButton::Secondary);
         let mouse_pos = input.pointer.hover_pos();
+        let mouse_over = mouse_pos.map_or(false, |pos| rect.contains(pos));
+
+        if !mouse_over {
+            self.last_mouse_pos = None;
+            return;
+        }
+
+        let mouse_down = input.pointer.button_down(egui::PointerButton::Secondary);
 
         if mouse_down {
             if let Some(pos) = mouse_pos {
-                if rect.contains(pos) {
-                    if let Some(last_pos) = self.last_mouse_pos {
-                        let delta = pos - last_pos;
-                        self.camera_yaw += delta.x * 0.01;
-                        self.camera_pitch += delta.y * 0.01;
-                        self.camera_pitch = self.camera_pitch.clamp(0.01, 1.5);
-                    }
-                    self.last_mouse_pos = Some(pos);
+                if let Some(last_pos) = self.last_mouse_pos {
+                    let delta = pos - last_pos;
+                    self.camera_yaw += delta.x * 0.01;
+                    self.camera_pitch += delta.y * 0.01;
+                    self.camera_pitch = self.camera_pitch.clamp(0.01, 1.5);
                 }
+                self.last_mouse_pos = Some(pos);
             }
         } else {
             self.last_mouse_pos = None;
         }
+
+        let keys_down = &input.keys_down;
 
         let forward = Vec3::new(
             self.camera_yaw.sin() * self.camera_pitch.cos(),
@@ -143,10 +152,10 @@ impl Viewport3DState {
         let right = Vec3::new(forward.z, 0.0, -forward.x).normalize();
 
         let mut move_dir = Vec3::ZERO;
-        if input.key_down(egui::Key::W) { move_dir += forward; }
-        if input.key_down(egui::Key::S) { move_dir -= forward; }
-        if input.key_down(egui::Key::A) { move_dir -= right; }
-        if input.key_down(egui::Key::D) { move_dir += right; }
+        if keys_down.contains(&egui::Key::W) { move_dir -= forward; }
+        if keys_down.contains(&egui::Key::S) { move_dir += forward; }
+        if keys_down.contains(&egui::Key::A) { move_dir -= right; }
+        if keys_down.contains(&egui::Key::D) { move_dir += right; }
         if move_dir.length_squared() > 0.0 {
             move_dir = move_dir.normalize();
             self.camera_target += move_dir * 0.1;
@@ -216,4 +225,4 @@ fn create_grid_geometry(gl: &glow::Context) -> (glow::VertexArray, glow::Buffer,
         gl.bind_vertex_array(None);
         (vao, vbo, vertex_count)
     }
-}   
+}
