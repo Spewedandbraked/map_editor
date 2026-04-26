@@ -88,16 +88,11 @@ impl eframe::App for Editor {
                         ui.close();
                         functions::open_3d_view(&self.command_sender);
                     }
-                    if ui.button("Tools").clicked() {
+                    if ui.selectable_label(self.dock_manager.tools_open, "Tools").clicked() {
                         ui.close();
                         functions::tools_menu(&self.command_sender);
                     }
-                    let sg_label = if scene_graph_open {
-                        "Scene Graph (ON)"
-                    } else {
-                        "Scene Graph (OFF)"
-                    };
-                    if ui.button(sg_label).clicked() {
+                    if ui.selectable_label(scene_graph_open, "Scene Graph").clicked() {
                         ui.close();
                         functions::toggle_scene_graph(&self.command_sender);
                     }
@@ -106,9 +101,7 @@ impl eframe::App for Editor {
         });
 
         let mut tools_open = self.dock_manager.tools_open;
-        let mut tools_tab_path = self.dock_manager.tools_tab_path.take();
         let mut scene_graph_open2 = self.dock_manager.scene_graph_open;
-        let mut scene_graph_tab_path = self.dock_manager.scene_graph_tab_path.take();
 
         let dock_state = self.dock_manager.dock_state_mut();
         let mut tab_viewer = TabViewer {
@@ -117,9 +110,7 @@ impl eframe::App for Editor {
             tabs_to_remove: &mut self.tabs_to_remove,
             scene_manager: &mut self.scene_manager,
             tools_open: &mut tools_open,
-            tools_tab_path: &mut tools_tab_path,
             scene_graph_open: &mut scene_graph_open2,
-            scene_graph_tab_path: &mut scene_graph_tab_path,
         };
 
         DockArea::new(dock_state)
@@ -127,13 +118,7 @@ impl eframe::App for Editor {
             .show_inside(ui, &mut tab_viewer);
 
         self.dock_manager.tools_open = tools_open;
-        if tools_open {
-            self.dock_manager.tools_tab_path = tools_tab_path;
-        }
         self.dock_manager.scene_graph_open = scene_graph_open2;
-        if scene_graph_open2 {
-            self.dock_manager.scene_graph_tab_path = scene_graph_tab_path;
-        }
     }
 }
 

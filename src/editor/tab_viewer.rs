@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use eframe::egui;
 use egui_dock::tab_viewer::OnCloseResponse;
-use egui_dock::TabPath;
 use crate::editor::dock_manager::Tab;
 use crate::editor::scene_manager::SceneManager;
 use crate::ui::menus::viewport::Viewport3DState;
@@ -13,9 +12,7 @@ pub struct TabViewer<'a> {
     pub tabs_to_remove: &'a mut Vec<usize>,
     pub scene_manager: &'a mut SceneManager,
     pub tools_open: &'a mut bool,
-    pub tools_tab_path: &'a mut Option<TabPath>,
     pub scene_graph_open: &'a mut bool,
-    pub scene_graph_tab_path: &'a mut Option<TabPath>,
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
@@ -93,11 +90,9 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             }
             Tab::Tools => {
                 *self.tools_open = false;
-                *self.tools_tab_path = None;
             }
             Tab::SceneGraph => {
                 *self.scene_graph_open = false;
-                *self.scene_graph_tab_path = None;
             }
             _ => {}
         }
