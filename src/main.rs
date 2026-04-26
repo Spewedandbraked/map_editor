@@ -1,7 +1,9 @@
-mod ui;
-mod scene;
 mod asset;
+mod editor;
+mod scene;
+mod ui;
 
+use editor::Editor;
 use asset::registry::AssetRegistry;
 
 fn main() {
@@ -14,7 +16,7 @@ fn main() {
         options,
         Box::new(|cc| {
             let asset_registry = AssetRegistry::new();
-            Ok(Box::new(ui::EditorApp::new(cc, asset_registry)))
+            Ok(Box::new(Editor::new(cc, asset_registry)))
         }),
     )
     .unwrap();
