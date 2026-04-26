@@ -1,4 +1,8 @@
 mod ui;
+mod scene;
+mod asset;
+
+use asset::registry::AssetRegistry;
 
 fn main() {
     let options = eframe::NativeOptions {
@@ -8,7 +12,10 @@ fn main() {
     eframe::run_native(
         "Map Editor",
         options,
-        Box::new(|cc| Ok(Box::new(ui::EditorApp::new(cc)))),
+        Box::new(|cc| {
+            let asset_registry = AssetRegistry::new();
+            Ok(Box::new(ui::EditorApp::new(cc, asset_registry)))
+        }),
     )
     .unwrap();
 }
