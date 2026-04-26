@@ -50,9 +50,9 @@ impl DockManager {
         }
     }
 
-    pub fn remove_tab(&mut self, path: TabPath) {
-        self.dock_state.remove_tab(path);
-    }
+    // pub fn remove_tab(&mut self, path: TabPath) {
+    //     self.dock_state.remove_tab(path);
+    // }
 
     pub fn dock_state_mut(&mut self) -> &mut DockState<Tab> {
         &mut self.dock_state

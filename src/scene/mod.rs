@@ -1,4 +1,5 @@
-use glam::{Vec3, Quat};
+// use glam::Quat;
+use glam::Vec3;
 
 #[derive(Debug, Clone)]
 pub struct SceneEntity {
@@ -6,8 +7,8 @@ pub struct SceneEntity {
     pub name: String,
     pub asset_id: String,
     pub translation: Vec3,
-    pub rotation: Quat,
-    pub scale: Vec3,
+    // pub rotation: Quat,
+    // pub scale: Vec3,
 }
 
 pub struct SceneGraph {
@@ -17,7 +18,10 @@ pub struct SceneGraph {
 
 impl SceneGraph {
     pub fn new() -> Self {
-        Self { entities: Vec::new(), next_id: 0 }
+        Self {
+            entities: Vec::new(),
+            next_id: 0,
+        }
     }
 
     pub fn add_entity(&mut self, name: String, asset_id: String) -> usize {
@@ -28,8 +32,8 @@ impl SceneGraph {
             name,
             asset_id,
             translation: Vec3::ZERO,
-            rotation: Quat::IDENTITY,
-            scale: Vec3::ONE,
+            // rotation: Quat::IDENTITY,
+            // scale: Vec3::ONE,
         });
         id
     }
