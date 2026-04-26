@@ -1,14 +1,17 @@
+pub mod dock_manager;
+pub mod scene_manager;
+pub mod tab_viewer;
+
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
-
 use eframe::egui::{self, Ui};
 use eframe::CreationContext;
-use egui_dock::tab_viewer::OnCloseResponse;
-use egui_dock::{DockArea, DockState, NodeIndex, Style, TabPath};
-
+use egui_dock::{DockArea, Style};
 use crate::asset::registry::AssetRegistry;
-use crate::scene::SceneGraph;
+use crate::editor::dock_manager::DockManager;
+use crate::editor::scene_manager::SceneManager;
+use crate::editor::tab_viewer::TabViewer;
 use crate::ui::menus::viewport_3d::Viewport3DState;
 use crate::ui::functions;
 
@@ -18,28 +21,15 @@ pub enum Command {
     ToggleTools,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum Tab {
-    Viewport3D(usize),
-    SceneGraph,
-    Properties,
-    Console,
-    Tools,
-}
-
 pub struct Editor {
-    dock_state: DockState<Tab>,
     command_sender: Sender<Command>,
     command_receiver: Receiver<Command>,
     gl: Option<Arc<glow::Context>>,
     viewports: HashMap<usize, Viewport3DState>,
     next_viewport_id: usize,
     tabs_to_remove: Vec<usize>,
-    scene_graph: SceneGraph,
-    asset_registry: AssetRegistry,
-    tools_open: bool,
-    tools_tab_path: Option<TabPath>,
-    selected_entity_id: Option<usize>,
+    dock_manager: DockManager,
+    scene_manager: SceneManager,
 }
 
 impl Editor {
@@ -47,23 +37,15 @@ impl Editor {
         let (tx, rx) = mpsc::channel();
         let gl = cc.gl.as_ref().map(|gl| gl.clone());
 
-        let mut dock_state = DockState::new(vec![Tab::SceneGraph]);
-        let tree = dock_state.main_surface_mut();
-        tree.split_right(NodeIndex::root(), 0.75, vec![Tab::Properties, Tab::Console]);
-
         Self {
-            dock_state,
             command_sender: tx,
             command_receiver: rx,
             gl,
             viewports: HashMap::new(),
             next_viewport_id: 0,
             tabs_to_remove: Vec::new(),
-            scene_graph: SceneGraph::new(),
-            asset_registry,
-            tools_open: false,
-            tools_tab_path: None,
-            selected_entity_id: None,
+            dock_manager: DockManager::new(),
+            scene_manager: SceneManager::new(asset_registry),
         }
     }
 }
@@ -111,29 +93,29 @@ impl eframe::App for Editor {
             });
         });
 
-        let viewports = &mut self.viewports;
-        let gl = &self.gl;
-        let tabs_to_remove = &mut self.tabs_to_remove;
-        let scene_graph = &self.scene_graph;
-        let asset_registry = &self.asset_registry;
-        let tools_open = &mut self.tools_open;
-        let tools_tab_path = &mut self.tools_tab_path;
-        let selected_entity_id = &mut self.selected_entity_id;
+        // Копируем флаги, чтобы избежать конфликта с dock_state_mut()
+        let mut tools_open = self.dock_manager.tools_open;
+        let mut tools_tab_path = self.dock_manager.tools_tab_path.take();
 
+        let dock_state = self.dock_manager.dock_state_mut();
         let mut tab_viewer = TabViewer {
-            gl,
-            viewports,
-            tabs_to_remove,
-            scene_graph,
-            asset_registry,
-            tools_open,
-            tools_tab_path,
-            selected_entity_id,
+            gl: &self.gl,
+            viewports: &mut self.viewports,
+            tabs_to_remove: &mut self.tabs_to_remove,
+            scene_manager: &mut self.scene_manager,
+            tools_open: &mut tools_open,
+            tools_tab_path: &mut tools_tab_path,
         };
 
-        DockArea::new(&mut self.dock_state)
+        DockArea::new(dock_state)
             .style(Style::from_egui(ctx.global_style().as_ref()))
             .show_inside(ui, &mut tab_viewer);
+
+        // Синхронизируем флаги обратно
+        self.dock_manager.tools_open = tools_open;
+        if tools_open {
+            self.dock_manager.tools_tab_path = tools_tab_path;
+        }
     }
 }
 
@@ -146,126 +128,23 @@ impl Editor {
                     let id = self.next_viewport_id;
                     self.next_viewport_id += 1;
                     self.viewports.insert(id, Viewport3DState::new(&gl));
-                    self.dock_state.push_to_focused_leaf(Tab::Viewport3D(id));
+                    self.dock_manager.add_viewport(id);
                 }
                 Command::NewProject => {
-                    self.scene_graph.clear();
                     self.viewports.clear();
                     self.next_viewport_id = 0;
-                    self.selected_entity_id = None;
-                    self.dock_state = DockState::new(vec![Tab::SceneGraph]);
-                    let tree = self.dock_state.main_surface_mut();
-                    tree.split_right(NodeIndex::root(), 0.75, vec![Tab::Properties, Tab::Console]);
+                    self.dock_manager.reset();
+                    self.scene_manager.reset();
                     let gl = self.gl.as_ref().expect("No GL context").clone();
                     let id = self.next_viewport_id;
                     self.next_viewport_id += 1;
                     self.viewports.insert(id, Viewport3DState::new(&gl));
-                    self.dock_state.push_to_focused_leaf(Tab::Viewport3D(id));
-                    self.scene_graph.add_entity("Default Cube".to_string(), "default_cube".to_string());
+                    self.dock_manager.add_viewport(id);
                 }
                 Command::ToggleTools => {
-                    self.tools_open = !self.tools_open;
-                    if self.tools_open {
-                        self.dock_state.push_to_focused_leaf(Tab::Tools);
-                        self.tools_tab_path = self.dock_state.find_tab(&Tab::Tools);
-                    } else if let Some(path) = self.tools_tab_path.take() {
-                        self.dock_state.remove_tab(path);
-                    }
+                    self.dock_manager.toggle_tools();
                 }
             }
         }
-    }
-}
-
-struct TabViewer<'a> {
-    gl: &'a Option<Arc<glow::Context>>,
-    viewports: &'a mut HashMap<usize, Viewport3DState>,
-    tabs_to_remove: &'a mut Vec<usize>,
-    scene_graph: &'a SceneGraph,
-    asset_registry: &'a AssetRegistry,
-    tools_open: &'a mut bool,
-    tools_tab_path: &'a mut Option<TabPath>,
-    selected_entity_id: &'a mut Option<usize>,
-}
-
-impl<'a> egui_dock::TabViewer for TabViewer<'a> {
-    type Tab = Tab;
-
-    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        match tab {
-            Tab::Viewport3D(id) => format!("3D Viewport {}", id).into(),
-            Tab::SceneGraph => "Scene Graph".into(),
-            Tab::Properties => "Properties".into(),
-            Tab::Console => "Console".into(),
-            Tab::Tools => "Tools".into(),
-        }
-    }
-
-    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        match tab {
-            Tab::Viewport3D(id) => {
-                if let Some(state) = self.viewports.get_mut(id) {
-                    if let Some(gl) = self.gl.as_ref() {
-                        state.ui(ui, gl);
-                    }
-                }
-            }
-            Tab::SceneGraph => {
-                ui.label("Scene Graph");
-                for entity in &self.scene_graph.entities {
-                    let response = ui.selectable_label(
-                        *self.selected_entity_id == Some(entity.id),
-                        format!("{} ({})", entity.name, entity.asset_id),
-                    );
-                    if response.clicked() {
-                        *self.selected_entity_id = Some(entity.id);
-                    }
-                }
-            }
-            Tab::Properties => {
-                if let Some(id) = *self.selected_entity_id {
-                    if let Some(entity) = self.scene_graph.get(id) {
-                        ui.label(format!("Name: {}", entity.name));
-                        ui.label(format!("Asset: {}", entity.asset_id));
-                        ui.label(format!(
-                            "Position: ({:.2}, {:.2}, {:.2})",
-                            entity.translation.x, entity.translation.y, entity.translation.z
-                        ));
-                    } else {
-                        ui.label("Selected entity not found");
-                    }
-                } else {
-                    ui.label("No entity selected");
-                }
-            }
-            Tab::Console => {
-                ui.label("Console");
-            }
-            Tab::Tools => {
-                ui.label("Project Asset Storage");
-                for entity in &self.scene_graph.entities {
-                    let path = self
-                        .asset_registry
-                        .path(&entity.asset_id)
-                        .map(|s| s.as_str())
-                        .unwrap_or("N/A");
-                    ui.label(format!("{} -> {}", entity.name, path));
-                }
-            }
-        }
-    }
-
-    fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
-        match tab {
-            Tab::Viewport3D(id) => {
-                self.tabs_to_remove.push(*id);
-            }
-            Tab::Tools => {
-                *self.tools_open = false;
-                *self.tools_tab_path = None;
-            }
-            _ => {}
-        }
-        OnCloseResponse::Close
     }
 }
