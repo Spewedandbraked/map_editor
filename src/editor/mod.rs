@@ -19,6 +19,7 @@ pub enum Command {
     AddViewport,
     NewProject,
     ToggleTools,
+    ToggleSceneGraph,
 }
 
 pub struct Editor {
@@ -60,6 +61,8 @@ impl eframe::App for Editor {
 
         let ctx = ui.ctx().clone();
 
+        let scene_graph_open = self.dock_manager.scene_graph_open;
+
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -89,13 +92,23 @@ impl eframe::App for Editor {
                         ui.close();
                         functions::tools_menu(&self.command_sender);
                     }
+                    let sg_label = if scene_graph_open {
+                        "Scene Graph (ON)"
+                    } else {
+                        "Scene Graph (OFF)"
+                    };
+                    if ui.button(sg_label).clicked() {
+                        ui.close();
+                        functions::toggle_scene_graph(&self.command_sender);
+                    }
                 });
             });
         });
 
-        // Копируем флаги, чтобы избежать конфликта с dock_state_mut()
         let mut tools_open = self.dock_manager.tools_open;
         let mut tools_tab_path = self.dock_manager.tools_tab_path.take();
+        let mut scene_graph_open2 = self.dock_manager.scene_graph_open;
+        let mut scene_graph_tab_path = self.dock_manager.scene_graph_tab_path.take();
 
         let dock_state = self.dock_manager.dock_state_mut();
         let mut tab_viewer = TabViewer {
@@ -105,16 +118,21 @@ impl eframe::App for Editor {
             scene_manager: &mut self.scene_manager,
             tools_open: &mut tools_open,
             tools_tab_path: &mut tools_tab_path,
+            scene_graph_open: &mut scene_graph_open2,
+            scene_graph_tab_path: &mut scene_graph_tab_path,
         };
 
         DockArea::new(dock_state)
             .style(Style::from_egui(ctx.global_style().as_ref()))
             .show_inside(ui, &mut tab_viewer);
 
-        // Синхронизируем флаги обратно
         self.dock_manager.tools_open = tools_open;
         if tools_open {
             self.dock_manager.tools_tab_path = tools_tab_path;
+        }
+        self.dock_manager.scene_graph_open = scene_graph_open2;
+        if scene_graph_open2 {
+            self.dock_manager.scene_graph_tab_path = scene_graph_tab_path;
         }
     }
 }
@@ -143,6 +161,9 @@ impl Editor {
                 }
                 Command::ToggleTools => {
                     self.dock_manager.toggle_tools();
+                }
+                Command::ToggleSceneGraph => {
+                    self.dock_manager.toggle_scene_graph();
                 }
             }
         }

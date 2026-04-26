@@ -14,6 +14,8 @@ pub struct TabViewer<'a> {
     pub scene_manager: &'a mut SceneManager,
     pub tools_open: &'a mut bool,
     pub tools_tab_path: &'a mut Option<TabPath>,
+    pub scene_graph_open: &'a mut bool,
+    pub scene_graph_tab_path: &'a mut Option<TabPath>,
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
@@ -24,7 +26,6 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             Tab::Viewport3D(id) => format!("3D Viewport {}", id).into(),
             Tab::SceneGraph => "Scene Graph".into(),
             Tab::Properties => "Properties".into(),
-            Tab::Console => "Console".into(),
             Tab::Tools => "Tools".into(),
         }
     }
@@ -40,7 +41,6 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             }
             Tab::SceneGraph => {
                 ui.label("Scene Graph");
-                // Собираем данные, не удерживая ссылки на SceneManager
                 let items: Vec<(usize, String)> = {
                     let scene_graph = self.scene_manager.scene_graph();
                     scene_graph.entities.iter().map(|e| (e.id, format!("{} ({})", e.name, e.asset_id))).collect()
@@ -74,9 +74,6 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                     ui.label("No entity selected");
                 }
             }
-            Tab::Console => {
-                ui.label("Console");
-            }
             Tab::Tools => {
                 ui.label("Project Asset Storage");
                 let asset_registry = self.scene_manager.asset_registry();
@@ -97,6 +94,10 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             Tab::Tools => {
                 *self.tools_open = false;
                 *self.tools_tab_path = None;
+            }
+            Tab::SceneGraph => {
+                *self.scene_graph_open = false;
+                *self.scene_graph_tab_path = None;
             }
             _ => {}
         }
