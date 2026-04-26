@@ -12,6 +12,7 @@ pub struct DockManager {
     dock_state: DockState<Tab>,
     pub tools_open: bool,
     pub scene_graph_open: bool,
+    pub properties_open: bool,
 }
 
 impl DockManager {
@@ -21,6 +22,7 @@ impl DockManager {
             dock_state,
             tools_open: false,
             scene_graph_open: false,
+            properties_open: true,
         }
     }
 
@@ -28,6 +30,7 @@ impl DockManager {
         self.dock_state = DockState::new(vec![Tab::Properties]);
         self.tools_open = false;
         self.scene_graph_open = false;
+        self.properties_open = true;
     }
 
     pub fn add_viewport(&mut self, id: usize) {
@@ -48,6 +51,15 @@ impl DockManager {
         if self.scene_graph_open {
             self.dock_state.push_to_focused_leaf(Tab::SceneGraph);
         } else if let Some(path) = self.dock_state.find_tab(&Tab::SceneGraph) {
+            self.dock_state.remove_tab(path);
+        }
+    }
+
+    pub fn toggle_properties(&mut self) {
+        self.properties_open = !self.properties_open;
+        if self.properties_open {
+            self.dock_state.push_to_focused_leaf(Tab::Properties);
+        } else if let Some(path) = self.dock_state.find_tab(&Tab::Properties) {
             self.dock_state.remove_tab(path);
         }
     }

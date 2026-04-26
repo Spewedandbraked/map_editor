@@ -20,6 +20,7 @@ pub enum Command {
     NewProject,
     ToggleTools,
     ToggleSceneGraph,
+    ToggleProperties,
 }
 
 pub struct Editor {
@@ -62,6 +63,7 @@ impl eframe::App for Editor {
         let ctx = ui.ctx().clone();
 
         let scene_graph_open = self.dock_manager.scene_graph_open;
+        let properties_open = self.dock_manager.properties_open;
 
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
@@ -96,12 +98,17 @@ impl eframe::App for Editor {
                         ui.close();
                         functions::toggle_scene_graph(&self.command_sender);
                     }
+                    if ui.selectable_label(properties_open, "Properties").clicked() {
+                        ui.close();
+                        functions::toggle_properties(&self.command_sender);
+                    }
                 });
             });
         });
 
         let mut tools_open = self.dock_manager.tools_open;
         let mut scene_graph_open2 = self.dock_manager.scene_graph_open;
+        let mut properties_open2 = self.dock_manager.properties_open;
 
         let dock_state = self.dock_manager.dock_state_mut();
         let mut tab_viewer = TabViewer {
@@ -111,6 +118,7 @@ impl eframe::App for Editor {
             scene_manager: &mut self.scene_manager,
             tools_open: &mut tools_open,
             scene_graph_open: &mut scene_graph_open2,
+            properties_open: &mut properties_open2,
         };
 
         DockArea::new(dock_state)
@@ -119,6 +127,7 @@ impl eframe::App for Editor {
 
         self.dock_manager.tools_open = tools_open;
         self.dock_manager.scene_graph_open = scene_graph_open2;
+        self.dock_manager.properties_open = properties_open2;
     }
 }
 
@@ -149,6 +158,9 @@ impl Editor {
                 }
                 Command::ToggleSceneGraph => {
                     self.dock_manager.toggle_scene_graph();
+                }
+                Command::ToggleProperties => {
+                    self.dock_manager.toggle_properties();
                 }
             }
         }

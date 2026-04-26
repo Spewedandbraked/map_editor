@@ -13,6 +13,7 @@ pub struct TabViewer<'a> {
     pub scene_manager: &'a mut SceneManager,
     pub tools_open: &'a mut bool,
     pub scene_graph_open: &'a mut bool,
+    pub properties_open: &'a mut bool,
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
@@ -93,6 +94,9 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             }
             Tab::SceneGraph => {
                 *self.scene_graph_open = false;
+            }
+            Tab::Properties => {
+                *self.properties_open = false;
             }
             _ => {}
         }
