@@ -1,4 +1,5 @@
-use egui_dock::{DockState, TabPath};
+use egui_dock::DockState;
+use crate::editor::window::{PanelWindow, tools::ToolsWindow, scene_graph::SceneGraphWindow, properties::PropertiesWindow};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tab {
@@ -10,27 +11,26 @@ pub enum Tab {
 
 pub struct DockManager {
     dock_state: DockState<Tab>,
-    pub tools_open: bool,
-    pub scene_graph_open: bool,
-    pub properties_open: bool,
+    pub tools: ToolsWindow,
+    pub scene_graph: SceneGraphWindow,
+    pub properties: PropertiesWindow,
 }
 
 impl DockManager {
     pub fn new() -> Self {
-        let dock_state = DockState::new(vec![Tab::Properties]);
         Self {
-            dock_state,
-            tools_open: false,
-            scene_graph_open: false,
-            properties_open: true,
+            dock_state: DockState::new(vec![Tab::Properties]),
+            tools: ToolsWindow::new(),
+            scene_graph: SceneGraphWindow::new(),
+            properties: PropertiesWindow::new(),
         }
     }
 
     pub fn reset(&mut self) {
         self.dock_state = DockState::new(vec![Tab::Properties]);
-        self.tools_open = false;
-        self.scene_graph_open = false;
-        self.properties_open = true;
+        self.tools = ToolsWindow::new();
+        self.scene_graph = SceneGraphWindow::new();
+        self.properties = PropertiesWindow::new();
     }
 
     pub fn add_viewport(&mut self, id: usize) {
@@ -38,33 +38,30 @@ impl DockManager {
     }
 
     pub fn toggle_tools(&mut self) {
-        self.tools_open = !self.tools_open;
-        if self.tools_open {
-            self.dock_state.push_to_focused_leaf(Tab::Tools);
-        } else if let Some(path) = self.dock_state.find_tab(&Tab::Tools) {
-            self.dock_state.remove_tab(path);
-        }
+        self.tools.toggle(&mut self.dock_state);
     }
 
     pub fn toggle_scene_graph(&mut self) {
-        self.scene_graph_open = !self.scene_graph_open;
-        if self.scene_graph_open {
-            self.dock_state.push_to_focused_leaf(Tab::SceneGraph);
-        } else if let Some(path) = self.dock_state.find_tab(&Tab::SceneGraph) {
-            self.dock_state.remove_tab(path);
-        }
+        self.scene_graph.toggle(&mut self.dock_state);
     }
 
     pub fn toggle_properties(&mut self) {
-        self.properties_open = !self.properties_open;
-        if self.properties_open {
-            self.dock_state.push_to_focused_leaf(Tab::Properties);
-        } else if let Some(path) = self.dock_state.find_tab(&Tab::Properties) {
-            self.dock_state.remove_tab(path);
-        }
+        self.properties.toggle(&mut self.dock_state);
     }
 
     pub fn dock_state_mut(&mut self) -> &mut DockState<Tab> {
         &mut self.dock_state
+    }
+
+    pub fn on_close_tools(&mut self) {
+        self.tools.on_close();
+    }
+
+    pub fn on_close_scene_graph(&mut self) {
+        self.scene_graph.on_close();
+    }
+
+    pub fn on_close_properties(&mut self) {
+        self.properties.on_close();
     }
 }

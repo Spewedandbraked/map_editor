@@ -1,6 +1,7 @@
 pub mod dock_manager;
 pub mod scene_manager;
 pub mod tab_viewer;
+pub mod window;
 
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -12,6 +13,7 @@ use crate::asset::registry::AssetRegistry;
 use crate::editor::dock_manager::DockManager;
 use crate::editor::scene_manager::SceneManager;
 use crate::editor::tab_viewer::TabViewer;
+use crate::editor::window::PanelWindow;
 use crate::ui::menus::viewport::Viewport3DState;
 use crate::ui::functions;
 
@@ -21,6 +23,9 @@ pub enum Command {
     ToggleTools,
     ToggleSceneGraph,
     ToggleProperties,
+    CloseTools,
+    CloseSceneGraph,
+    CloseProperties,
 }
 
 pub struct Editor {
@@ -62,8 +67,9 @@ impl eframe::App for Editor {
 
         let ctx = ui.ctx().clone();
 
-        let scene_graph_open = self.dock_manager.scene_graph_open;
-        let properties_open = self.dock_manager.properties_open;
+        let tools_open = self.dock_manager.tools.is_open();
+        let scene_graph_open = self.dock_manager.scene_graph.is_open();
+        let properties_open = self.dock_manager.properties.is_open();
 
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
@@ -90,7 +96,7 @@ impl eframe::App for Editor {
                         ui.close();
                         functions::open_3d_view(&self.command_sender);
                     }
-                    if ui.selectable_label(self.dock_manager.tools_open, "Tools").clicked() {
+                    if ui.selectable_label(tools_open, "Tools").clicked() {
                         ui.close();
                         functions::tools_menu(&self.command_sender);
                     }
@@ -106,28 +112,21 @@ impl eframe::App for Editor {
             });
         });
 
-        let mut tools_open = self.dock_manager.tools_open;
-        let mut scene_graph_open2 = self.dock_manager.scene_graph_open;
-        let mut properties_open2 = self.dock_manager.properties_open;
-
-        let dock_state = self.dock_manager.dock_state_mut();
         let mut tab_viewer = TabViewer {
             gl: &self.gl,
             viewports: &mut self.viewports,
             tabs_to_remove: &mut self.tabs_to_remove,
             scene_manager: &mut self.scene_manager,
-            tools_open: &mut tools_open,
-            scene_graph_open: &mut scene_graph_open2,
-            properties_open: &mut properties_open2,
+            command_sender: self.command_sender.clone(),
+            tools_open,
+            scene_graph_open,
+            properties_open,
         };
 
+        let dock_state = self.dock_manager.dock_state_mut();
         DockArea::new(dock_state)
             .style(Style::from_egui(ctx.global_style().as_ref()))
             .show_inside(ui, &mut tab_viewer);
-
-        self.dock_manager.tools_open = tools_open;
-        self.dock_manager.scene_graph_open = scene_graph_open2;
-        self.dock_manager.properties_open = properties_open2;
     }
 }
 
@@ -161,6 +160,15 @@ impl Editor {
                 }
                 Command::ToggleProperties => {
                     self.dock_manager.toggle_properties();
+                }
+                Command::CloseTools => {
+                    self.dock_manager.on_close_tools();
+                }
+                Command::CloseSceneGraph => {
+                    self.dock_manager.on_close_scene_graph();
+                }
+                Command::CloseProperties => {
+                    self.dock_manager.on_close_properties();
                 }
             }
         }

@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use eframe::egui;
 use egui_dock::tab_viewer::OnCloseResponse;
 use crate::editor::dock_manager::Tab;
+use crate::editor::Command;
 use crate::editor::scene_manager::SceneManager;
 use crate::ui::menus::viewport::Viewport3DState;
 
@@ -11,9 +13,10 @@ pub struct TabViewer<'a> {
     pub viewports: &'a mut HashMap<usize, Viewport3DState>,
     pub tabs_to_remove: &'a mut Vec<usize>,
     pub scene_manager: &'a mut SceneManager,
-    pub tools_open: &'a mut bool,
-    pub scene_graph_open: &'a mut bool,
-    pub properties_open: &'a mut bool,
+    pub command_sender: Sender<Command>,
+    pub tools_open: bool,
+    pub scene_graph_open: bool,
+    pub properties_open: bool,
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
@@ -90,15 +93,17 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                 self.tabs_to_remove.push(*id);
             }
             Tab::Tools => {
-                *self.tools_open = false;
+                let _ = self.command_sender.send(Command::CloseTools);
+                self.tools_open = false;
             }
             Tab::SceneGraph => {
-                *self.scene_graph_open = false;
+                let _ = self.command_sender.send(Command::CloseSceneGraph);
+                self.scene_graph_open = false;
             }
             Tab::Properties => {
-                *self.properties_open = false;
+                let _ = self.command_sender.send(Command::CloseProperties);
+                self.properties_open = false;
             }
-            _ => {}
         }
         OnCloseResponse::Close
     }
