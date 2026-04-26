@@ -12,7 +12,7 @@ use crate::asset::registry::AssetRegistry;
 use crate::editor::dock_manager::DockManager;
 use crate::editor::scene_manager::SceneManager;
 use crate::editor::tab_viewer::TabViewer;
-use crate::ui::menus::viewport_3d::Viewport3DState;
+use crate::ui::menus::viewport::Viewport3DState;
 use crate::ui::functions;
 
 pub enum Command {

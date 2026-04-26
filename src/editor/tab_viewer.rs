@@ -5,7 +5,7 @@ use egui_dock::tab_viewer::OnCloseResponse;
 use egui_dock::TabPath;
 use crate::editor::dock_manager::Tab;
 use crate::editor::scene_manager::SceneManager;
-use crate::ui::menus::viewport_3d::Viewport3DState;
+use crate::ui::menus::viewport::Viewport3DState;
 
 pub struct TabViewer<'a> {
     pub gl: &'a Option<Arc<glow::Context>>,
