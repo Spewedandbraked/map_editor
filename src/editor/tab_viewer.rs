@@ -14,9 +14,6 @@ pub struct TabViewer<'a> {
     pub tabs_to_remove: &'a mut Vec<usize>,
     pub scene_manager: &'a mut SceneManager,
     pub command_sender: Sender<Command>,
-    pub tools_open: bool,
-    pub scene_graph_open: bool,
-    pub properties_open: bool,
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
@@ -55,7 +52,9 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                     }
                 }
                 if new_selection != selected_id {
-                    self.scene_manager.select_entity(new_selection.unwrap());
+                    if let Some(id) = new_selection {
+                        self.scene_manager.select_entity(id);
+                    }
                 }
             }
             Tab::Properties => {
@@ -67,6 +66,16 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                         ui.label(format!(
                             "Position: ({:.2}, {:.2}, {:.2})",
                             entity.translation.x, entity.translation.y, entity.translation.z
+                        ));
+                        ui.label(format!(
+                            "Rotation: ({:.2}, {:.2}, {:.2})",
+                            entity.rotation.to_euler(glam::EulerRot::XYZ).0,
+                            entity.rotation.to_euler(glam::EulerRot::XYZ).1,
+                            entity.rotation.to_euler(glam::EulerRot::XYZ).2
+                        ));
+                        ui.label(format!(
+                            "Scale: ({:.2}, {:.2}, {:.2})",
+                            entity.scale.x, entity.scale.y, entity.scale.z
                         ));
                     } else {
                         ui.label("Selected entity not found");
@@ -94,15 +103,12 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             }
             Tab::Tools => {
                 let _ = self.command_sender.send(Command::CloseTools);
-                self.tools_open = false;
             }
             Tab::SceneGraph => {
                 let _ = self.command_sender.send(Command::CloseSceneGraph);
-                self.scene_graph_open = false;
             }
             Tab::Properties => {
                 let _ = self.command_sender.send(Command::CloseProperties);
-                self.properties_open = false;
             }
         }
         OnCloseResponse::Close

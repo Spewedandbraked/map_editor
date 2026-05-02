@@ -118,9 +118,6 @@ impl eframe::App for Editor {
             tabs_to_remove: &mut self.tabs_to_remove,
             scene_manager: &mut self.scene_manager,
             command_sender: self.command_sender.clone(),
-            tools_open,
-            scene_graph_open,
-            properties_open,
         };
 
         let dock_state = self.dock_manager.dock_state_mut();

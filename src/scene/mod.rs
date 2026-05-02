@@ -1,5 +1,4 @@
-// use glam::Quat;
-use glam::Vec3;
+use glam::{Quat, Vec3};
 
 #[derive(Debug, Clone)]
 pub struct SceneEntity {
@@ -7,8 +6,8 @@ pub struct SceneEntity {
     pub name: String,
     pub asset_id: String,
     pub translation: Vec3,
-    // pub rotation: Quat,
-    // pub scale: Vec3,
+    pub rotation: Quat,
+    pub scale: Vec3,
 }
 
 pub struct SceneGraph {
@@ -32,8 +31,8 @@ impl SceneGraph {
             name,
             asset_id,
             translation: Vec3::ZERO,
-            // rotation: Quat::IDENTITY,
-            // scale: Vec3::ONE,
+            rotation: Quat::IDENTITY,
+            scale: Vec3::ONE,
         });
         id
     }

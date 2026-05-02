@@ -1,3 +1,3 @@
-pub fn save_project() {
-    println!("Save Project");
-}
+    pub fn save_project() {
+        println!("Save Project");
+    }

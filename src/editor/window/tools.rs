@@ -14,7 +14,6 @@ impl ToolsWindow {
 
 impl PanelWindow for ToolsWindow {
     fn is_open(&self) -> bool { self.open }
-    fn set_open(&mut self, open: bool) { self.open = open; }
 
     fn toggle(&mut self, dock_state: &mut DockState<Tab>) {
         self.open = !self.open;

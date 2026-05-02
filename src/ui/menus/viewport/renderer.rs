@@ -16,34 +16,6 @@ impl Renderer {
             vertex_count,
         }
     }
-
-    pub fn render(&self, gl: &glow::Context, camera: &super::camera::Camera, size: [i32; 2]) {
-        unsafe {
-            gl.enable(glow::DEPTH_TEST);
-            gl.clear_color(0.2, 0.2, 0.2, 1.0);
-            gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
-            gl.use_program(Some(self.program));
-
-            let view = camera.view_matrix();
-            let proj = glam::Mat4::perspective_rh(
-                60.0f32.to_radians(),
-                size[0] as f32 / size[1] as f32,
-                0.1,
-                100.0,
-            );
-            let mvp = proj * view;
-
-            gl.uniform_matrix_4_f32_slice(
-                gl.get_uniform_location(self.program, "u_mvp").as_ref(),
-                false,
-                &mvp.to_cols_array(),
-            );
-
-            gl.bind_vertex_array(Some(self.vao));
-            gl.draw_arrays(glow::LINES, 0, self.vertex_count);
-            gl.disable(glow::DEPTH_TEST);
-        }
-    }
 }
 
 fn create_shader_program(gl: &glow::Context) -> glow::Program {

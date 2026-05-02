@@ -9,11 +9,13 @@ pub struct SceneManager {
 
 impl SceneManager {
     pub fn new(asset_registry: AssetRegistry) -> Self {
-        Self {
+        let mut manager = Self {
             scene_graph: SceneGraph::new(),
             asset_registry,
             selected_entity_id: None,
-        }
+        };
+        manager.reset();
+        manager
     }
 
     pub fn reset(&mut self) {
