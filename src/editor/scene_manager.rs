@@ -32,6 +32,10 @@ impl SceneManager {
         &self.asset_registry
     }
 
+    pub fn asset_registry_mut(&mut self) -> &mut AssetRegistry {
+        &mut self.asset_registry
+    }
+
     pub fn selected_entity_id(&self) -> Option<usize> {
         self.selected_entity_id
     }

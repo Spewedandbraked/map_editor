@@ -1,6 +1,7 @@
 pub mod tools;
 pub mod scene_graph;
 pub mod properties;
+pub mod assets;  // Новый модуль
 
 use egui_dock::DockState;
 use crate::editor::dock_manager::Tab;
