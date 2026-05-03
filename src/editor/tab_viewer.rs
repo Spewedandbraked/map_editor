@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use crate::editor::dock_manager::Tab;
+use crate::editor::scene_manager::SceneManager;
+use crate::editor::Command;
+use crate::ui::menus::viewport::Viewport3DState;
 use eframe::egui;
 use egui_dock::tab_viewer::OnCloseResponse;
 use rfd::FileDialog;
-use crate::editor::dock_manager::Tab;
-use crate::editor::Command;
-use crate::editor::scene_manager::SceneManager;
-use crate::ui::menus::viewport::Viewport3DState;
+use std::collections::HashMap;
+use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 pub struct TabViewer<'a> {
     pub gl: &'a Option<Arc<glow::Context>>,
@@ -26,7 +26,7 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             Tab::SceneGraph => "Scene Graph".into(),
             Tab::Properties => "Properties".into(),
             Tab::Tools => "Tools".into(),
-            Tab::Assets => "Assets".into(),  // Убрал иконку 📁
+            Tab::Assets => "Assets".into(), // Убрал иконку 📁
         }
     }
 
@@ -43,7 +43,11 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                 ui.label("Scene Graph");
                 let items: Vec<(usize, String)> = {
                     let scene_graph = self.scene_manager.scene_graph();
-                    scene_graph.entities.iter().map(|e| (e.id, format!("{} ({})", e.name, e.asset_id))).collect()
+                    scene_graph
+                        .entities
+                        .iter()
+                        .map(|e| (e.id, format!("{} ({})", e.name, e.asset_id)))
+                        .collect()
                 };
                 let selected_id = self.scene_manager.selected_entity_id();
                 let mut new_selection = selected_id;
@@ -91,25 +95,42 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
                 let asset_registry = self.scene_manager.asset_registry();
                 let scene_graph = self.scene_manager.scene_graph();
                 for entity in &scene_graph.entities {
-                    let path = asset_registry.path(&entity.asset_id).map(|p| p.display().to_string()).unwrap_or("N/A".to_string());
+                    let path = asset_registry
+                        .path(&entity.asset_id)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or("N/A".to_string());
                     ui.label(format!("{} -> {}", entity.name, path));
                 }
             }
             Tab::Assets => {
                 // Кнопка в стиле меню (как в File)
-                if ui.button("Add File from Explorer").clicked() {
-                    if let Some(path) = FileDialog::new()
-                        .add_filter("All files", &["*"])
-                        .pick_file()
-                    {
-                        let asset_id = self.scene_manager.asset_registry_mut().add_asset(path, None);
-                        println!("✅ Asset added: {}", asset_id);
-                    }
-                }
-                
+                egui::Panel::top("assets_menu_bar")
+                    .frame(egui::Frame::default().inner_margin(egui::Margin {
+                        bottom: 6,
+                        ..Default::default()
+                    }))
+                    .show_inside(ui, |ui| {
+                        egui::MenuBar::new().ui(ui, |ui| {
+                            ui.menu_button("View", |ui| {
+                                if ui.button("Add File from Explorer").clicked() {
+                                    if let Some(path) = FileDialog::new()
+                                        .add_filter("All files", &["*"])
+                                        .pick_file()
+                                    {
+                                        let asset_id = self
+                                            .scene_manager
+                                            .asset_registry_mut()
+                                            .add_asset(path, None);
+                                        println!("✅ Asset added: {}", asset_id);
+                                    }
+                                }
+                            });
+                        })
+                    });
+
                 // Простой список ассетов без лишнего оформления
                 let assets = self.scene_manager.asset_registry().all_assets();
-                
+
                 if assets.is_empty() {
                     ui.label("No assets loaded.");
                 } else {
