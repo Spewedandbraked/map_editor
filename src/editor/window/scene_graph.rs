@@ -4,7 +4,6 @@ use super::PanelWindow;
 use crate::editor::dock_manager::Tab;
 use crate::editor::scene_manager::SceneManager;
 
-// Структура окна
 pub struct SceneGraphWindow {
     pub open: bool,
 }
@@ -32,7 +31,6 @@ impl PanelWindow for SceneGraphWindow {
     }
 }
 
-// Функция отображения содержимого
 pub fn show_scene_graph(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
     ui.label("Scene Graph");
     let items: Vec<(usize, String)> = {

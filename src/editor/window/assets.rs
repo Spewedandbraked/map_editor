@@ -4,8 +4,8 @@ use rfd::FileDialog;
 use super::PanelWindow;
 use crate::editor::dock_manager::Tab;
 use crate::editor::scene_manager::SceneManager;
+use crate::asset::model_loader;
 
-// Структура окна
 pub struct AssetsWindow {
     pub open: bool,
 }
@@ -33,9 +33,7 @@ impl PanelWindow for AssetsWindow {
     }
 }
 
-// Функция отображения содержимого
 pub fn show_assets(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
-    // Кнопка в стиле меню (как в File)
     egui::Panel::top("assets_menu_bar")
         .frame(egui::Frame::default().inner_margin(egui::Margin {
             bottom: 6,
@@ -46,11 +44,19 @@ pub fn show_assets(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
                 ui.menu_button("View", |ui| {
                     if ui.button("Add File from Explorer").clicked() {
                         if let Some(path) = FileDialog::new()
+                            .add_filter("Models", &["gltf", "glb", "obj"])
                             .add_filter("All files", &["*"])
                             .pick_file()
                         {
-                            let asset_id = scene_manager.asset_registry_mut().add_asset(path, None);
+                            let asset_id = scene_manager.asset_registry_mut().add_asset(path.clone(), None);
                             println!("✅ Asset added: {}", asset_id);
+                            
+                            if let Some(mesh_data) = model_loader::load_model(&path) {
+                                scene_manager.asset_registry_mut().add_mesh(&asset_id, mesh_data);
+                                println!("✅ Mesh loaded for asset: {}", asset_id);
+                            } else {
+                                println!("⚠️ Could not load mesh from file");
+                            }
                         }
                         ui.close();
                     }
@@ -58,23 +64,26 @@ pub fn show_assets(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
             })
         });
 
-    // Список ассетов с кнопкой добавления в сцену
-    // Сначала собираем ID ассетов, чтобы избежать проблем с заимствованием
-    let assets: Vec<(String, String)> = scene_manager
+    let assets: Vec<(String, String, crate::asset::registry::AssetType)> = scene_manager
         .asset_registry()
         .all_assets()
         .iter()
-        .map(|a| (a.id.clone(), a.name.clone()))
+        .map(|a| (a.id.clone(), a.name.clone(), a.asset_type.clone()))
         .collect();
 
     if assets.is_empty() {
         ui.label("No assets loaded.");
     } else {
-        for (asset_id, asset_name) in assets {
+        for (asset_id, asset_name, asset_type) in assets {
             ui.horizontal(|ui| {
-                ui.label(format!("{}", asset_name));
+                let type_icon = match asset_type {
+                    crate::asset::registry::AssetType::Model => "🎨",
+                    crate::asset::registry::AssetType::Texture => "🖼️",
+                    crate::asset::registry::AssetType::Sound => "🔊",
+                    crate::asset::registry::AssetType::Other => "📄",
+                };
+                ui.label(format!("{} {}", type_icon, asset_name));
                 
-                // Кнопка для добавления ассета в сцену
                 if ui.button("➕ Add to Scene").clicked() {
                     let entity_name = format!("{}_entity", asset_name);
                     let entity_id = scene_manager.scene_graph_mut().add_entity(entity_name, asset_id.clone());

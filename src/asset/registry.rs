@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct AssetInfo {
@@ -7,10 +8,41 @@ pub struct AssetInfo {
     pub id: String,
     pub name: String,
     pub path: PathBuf,
+    pub asset_type: AssetType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AssetType {
+    Model,
+    Texture,
+    Sound,
+    Other,
+}
+
+#[derive(Debug, Clone)]
+pub struct MeshData {
+    pub vertices: Vec<f32>,
+    pub indices: Vec<u32>,
+    pub vertex_count: i32,
+    pub index_count: i32,
+}
+
+impl MeshData {
+    pub fn new(vertices: Vec<f32>, indices: Vec<u32>) -> Self {
+        let vertex_count = (vertices.len() / 3) as i32;
+        let index_count = indices.len() as i32;
+        Self {
+            vertices,
+            indices,
+            vertex_count,
+            index_count,
+        }
+    }
 }
 
 pub struct AssetRegistry {
     assets: HashMap<String, AssetInfo>,
+    meshes: HashMap<String, Arc<MeshData>>,
     next_id: usize,
 }
 
@@ -18,6 +50,7 @@ impl AssetRegistry {
     pub fn new() -> Self {
         Self {
             assets: HashMap::new(),
+            meshes: HashMap::new(),
             next_id: 0,
         }
     }
@@ -33,13 +66,24 @@ impl AssetRegistry {
                 .to_string()
         });
         
+        let asset_type = Self::detect_asset_type(&path);
+        
         self.assets.insert(id.clone(), AssetInfo {
             id: id.clone(),
             name,
             path,
+            asset_type,
         });
         
         id
+    }
+
+    pub fn add_mesh(&mut self, asset_id: &str, mesh_data: MeshData) {
+        self.meshes.insert(asset_id.to_string(), Arc::new(mesh_data));
+    }
+
+    pub fn get_mesh(&self, asset_id: &str) -> Option<Arc<MeshData>> {
+        self.meshes.get(asset_id).cloned()
     }
 
     #[allow(dead_code)]
@@ -51,27 +95,20 @@ impl AssetRegistry {
         self.assets.get(id).map(|a| &a.path)
     }
 
-    #[allow(dead_code)]
-    pub fn name(&self, id: &str) -> Option<&String> {
-        self.assets.get(id).map(|a| &a.name)
-    }
-
     pub fn all_assets(&self) -> Vec<&AssetInfo> {
         self.assets.values().collect()
     }
 
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.assets.len()
     }
 
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.assets.is_empty()
-    }
-
-    #[allow(dead_code)]
-    pub fn remove_asset(&mut self, id: &str) -> Option<AssetInfo> {
-        self.assets.remove(id)
+    fn detect_asset_type(path: &PathBuf) -> AssetType {
+        match path.extension().and_then(|ext| ext.to_str()) {
+            Some("gltf") | Some("glb") | Some("obj") | Some("fbx") => AssetType::Model,
+            Some("png") | Some("jpg") | Some("jpeg") | Some("tga") | Some("bmp") => AssetType::Texture,
+            Some("wav") | Some("mp3") | Some("ogg") => AssetType::Sound,
+            _ => AssetType::Other,
+        }
     }
 }

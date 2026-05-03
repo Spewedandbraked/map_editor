@@ -23,11 +23,11 @@ pub enum Command {
     ToggleTools,
     ToggleSceneGraph,
     ToggleProperties,
-    ToggleAssets,  // Новая команда
+    ToggleAssets,
     CloseTools,
     CloseSceneGraph,
     CloseProperties,
-    CloseAssets,   // Новая команда
+    CloseAssets,
 }
 
 pub struct Editor {
@@ -72,7 +72,7 @@ impl eframe::App for Editor {
         let tools_open = self.dock_manager.tools.is_open();
         let scene_graph_open = self.dock_manager.scene_graph.is_open();
         let properties_open = self.dock_manager.properties.is_open();
-        let assets_open = self.dock_manager.assets.is_open();  // Новое
+        let assets_open = self.dock_manager.assets.is_open();
 
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
@@ -111,7 +111,7 @@ impl eframe::App for Editor {
                         ui.close();
                         functions::toggle_properties(&self.command_sender);
                     }
-                    if ui.selectable_label(assets_open, "Assets").clicked() {  // Новый пункт меню
+                    if ui.selectable_label(assets_open, "Assets").clicked() {
                         ui.close();
                         functions::toggle_assets(&self.command_sender);
                     }
@@ -165,7 +165,7 @@ impl Editor {
                 Command::ToggleProperties => {
                     self.dock_manager.toggle_properties();
                 }
-                Command::ToggleAssets => {  // Новая команда
+                Command::ToggleAssets => {
                     self.dock_manager.toggle_assets();
                 }
                 Command::CloseTools => {
@@ -177,7 +177,7 @@ impl Editor {
                 Command::CloseProperties => {
                     self.dock_manager.on_close_properties();
                 }
-                Command::CloseAssets => {  // Новая команда
+                Command::CloseAssets => {
                     self.dock_manager.on_close_assets();
                 }
             }

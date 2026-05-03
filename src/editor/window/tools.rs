@@ -4,7 +4,6 @@ use super::PanelWindow;
 use crate::editor::dock_manager::Tab;
 use crate::editor::scene_manager::SceneManager;
 
-// Структура окна (для управления открытием/закрытием)
 pub struct ToolsWindow {
     pub open: bool,
 }
@@ -32,7 +31,6 @@ impl PanelWindow for ToolsWindow {
     }
 }
 
-// Функция отображения содержимого окна
 pub fn show_tools(ui: &mut egui::Ui, scene_manager: &SceneManager) {
     ui.label("Project Asset Storage");
     let asset_registry = scene_manager.asset_registry();

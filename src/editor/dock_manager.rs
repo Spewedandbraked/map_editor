@@ -1,7 +1,5 @@
 use egui_dock::DockState;
 use crate::editor::window::PanelWindow;
-
-// Импортируем структуры окон (они остались в файлах как struct)
 use crate::editor::window::tools::ToolsWindow;
 use crate::editor::window::scene_graph::SceneGraphWindow;
 use crate::editor::window::properties::PropertiesWindow;

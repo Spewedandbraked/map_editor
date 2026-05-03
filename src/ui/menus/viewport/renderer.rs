@@ -1,25 +1,33 @@
 use glow::HasContext;
+use std::collections::HashMap;
+use crate::asset::registry::MeshData;
 
 pub struct Renderer {
     pub program: glow::Program,
     pub grid_vao: glow::VertexArray,
     pub grid_vertex_count: i32,
-    pub cube_vao: glow::VertexArray,
-    pub cube_vertex_count: i32,
+    pub mesh_vaos: HashMap<String, (glow::VertexArray, i32)>,
 }
 
 impl Renderer {
     pub fn new(gl: &glow::Context) -> Self {
         let program = create_shader_program(gl);
         let (grid_vao, grid_vertex_count) = create_grid_geometry(gl);
-        let (cube_vao, cube_vertex_count) = create_cube_geometry(gl);
         Self {
             program,
             grid_vao,
             grid_vertex_count,
-            cube_vao,
-            cube_vertex_count,
+            mesh_vaos: HashMap::new(),
         }
+    }
+
+    pub fn load_mesh(&mut self, gl: &glow::Context, asset_id: &str, mesh_data: &MeshData) {
+        let (vao, _) = create_mesh_geometry(gl, mesh_data);
+        self.mesh_vaos.insert(asset_id.to_string(), (vao, mesh_data.index_count));
+    }
+
+    pub fn get_mesh_vao(&self, asset_id: &str) -> Option<(glow::VertexArray, i32)> {
+        self.mesh_vaos.get(asset_id).copied()
     }
 }
 
@@ -44,9 +52,11 @@ fn create_shader_program(gl: &glow::Context) -> glow::Program {
         let vert = gl.create_shader(glow::VERTEX_SHADER).unwrap();
         gl.shader_source(vert, vertex_source);
         gl.compile_shader(vert);
+        
         let frag = gl.create_shader(glow::FRAGMENT_SHADER).unwrap();
         gl.shader_source(frag, fragment_source);
         gl.compile_shader(frag);
+        
         let program = gl.create_program().unwrap();
         gl.attach_shader(program, vert);
         gl.attach_shader(program, frag);
@@ -79,39 +89,23 @@ fn create_grid_geometry(gl: &glow::Context) -> (glow::VertexArray, i32) {
     }
 }
 
-fn create_cube_geometry(gl: &glow::Context) -> (glow::VertexArray, i32) {
-    // Вершины куба (12 треугольников = 36 вершин)
-    let vertices: Vec<f32> = vec![
-        // Передняя грань
-        -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,   0.5,  0.5,  0.5,
-        -0.5, -0.5,  0.5,   0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,
-        // Задняя грань
-        -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5,  0.5, -0.5,
-        -0.5, -0.5, -0.5,   0.5,  0.5, -0.5,  -0.5,  0.5, -0.5,
-        // Верхняя грань
-        -0.5,  0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
-        -0.5,  0.5, -0.5,   0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,
-        // Нижняя грань
-        -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5, -0.5,  0.5,
-        -0.5, -0.5, -0.5,   0.5, -0.5,  0.5,  -0.5, -0.5,  0.5,
-        // Левая грань
-        -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,
-        -0.5, -0.5, -0.5,  -0.5,  0.5,  0.5,  -0.5, -0.5,  0.5,
-        // Правая грань
-        0.5, -0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
-        0.5, -0.5, -0.5,   0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
-    ];
-    let vertex_count = (vertices.len() / 3) as i32;
-    
+fn create_mesh_geometry(gl: &glow::Context, mesh_data: &MeshData) -> (glow::VertexArray, i32) {
     unsafe {
         let vao = gl.create_vertex_array().unwrap();
         let vbo = gl.create_buffer().unwrap();
+        let ebo = gl.create_buffer().unwrap();
+        
         gl.bind_vertex_array(Some(vao));
+        
         gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-        gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&vertices), glow::STATIC_DRAW);
+        gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&mesh_data.vertices), glow::STATIC_DRAW);
         gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, 12, 0);
         gl.enable_vertex_attrib_array(0);
+        
+        gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(ebo));
+        gl.buffer_data_u8_slice(glow::ELEMENT_ARRAY_BUFFER, bytemuck::cast_slice(&mesh_data.indices), glow::STATIC_DRAW);
+        
         gl.bind_vertex_array(None);
-        (vao, vertex_count)
+        (vao, mesh_data.vertex_count)
     }
 }

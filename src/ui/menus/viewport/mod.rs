@@ -31,7 +31,7 @@ impl Viewport3DState {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, _gl: &glow::Context, scene_manager: &mut SceneManager) {
+    pub fn ui(&mut self, ui: &mut egui::Ui, gl: &glow::Context, scene_manager: &mut SceneManager) {
         let available_size = ui.available_size();
         let width = available_size.x.round() as i32;
         let height = available_size.y.round() as i32;
@@ -48,21 +48,30 @@ impl Viewport3DState {
 
         let program = self.renderer.program;
         let grid_vao = self.renderer.grid_vao;
-        let cube_vao = self.renderer.cube_vao;
         let grid_vertex_count = self.renderer.grid_vertex_count;
-        let cube_vertex_count = self.renderer.cube_vertex_count;
         let rotation = self.camera.rotation;
         let distance = self.camera.distance;
         let target = self.camera.target;
         let size = self.size;
         
-        // Собираем данные о сущностях для рендера (позиция и цвет)
-        let entities: Vec<(Vec3, glam::Quat, Vec3, usize)> = scene_manager
+        let entities: Vec<(usize, Vec3, glam::Quat, Vec3, String)> = scene_manager
             .scene_graph()
             .entities
             .iter()
-            .map(|e| (e.translation, e.rotation, e.scale, e.id))
+            .map(|e| (e.id, e.translation, e.rotation, e.scale, e.asset_id.clone()))
             .collect();
+        
+        for entity in &entities {
+            let asset_id = &entity.4;
+            if self.renderer.get_mesh_vao(asset_id).is_none() {
+                if let Some(mesh_data) = scene_manager.asset_registry().get_mesh(asset_id) {
+                    self.renderer.load_mesh(gl, asset_id, &mesh_data);
+                    println!("✅ Mesh loaded into renderer for asset: {}", asset_id);
+                }
+            }
+        }
+        
+        let mesh_vaos = self.renderer.mesh_vaos.clone();
 
         let cb = egui::PaintCallback {
             rect,
@@ -84,21 +93,22 @@ impl Viewport3DState {
                         100.0,
                     );
                     
-                    // 1. Рендер сетки (grid)
                     let grid_mvp = proj * view;
                     gl.uniform_matrix_4_f32_slice(
                         gl.get_uniform_location(program, "u_mvp").as_ref(),
                         false,
                         &grid_mvp.to_cols_array(),
                     );
-                    // Белый цвет для сетки
                     gl.uniform_3_f32(gl.get_uniform_location(program, "u_color").as_ref(), 0.5, 0.5, 0.5);
                     gl.bind_vertex_array(Some(grid_vao));
                     gl.draw_arrays(glow::LINES, 0, grid_vertex_count);
                     
-                    // 2. Рендер каждой сущности (куб)
-                    for (entity_pos, entity_rot, entity_scale, entity_id) in &entities {
-                        // Строим MVP матрицу для каждой сущности
+                    for (entity_id, entity_pos, entity_rot, entity_scale, asset_id) in &entities {
+                        let (mesh_vao, index_count) = match mesh_vaos.get(asset_id) {
+                            Some(data) => *data,
+                            None => continue,
+                        };
+                        
                         let model = glam::Mat4::from_translation(*entity_pos)
                             * glam::Mat4::from_quat(*entity_rot)
                             * glam::Mat4::from_scale(*entity_scale);
@@ -110,14 +120,13 @@ impl Viewport3DState {
                             &mvp.to_cols_array(),
                         );
                         
-                        // Разные цвета для разных сущностей (на основе ID)
                         let r = ((entity_id * 50) % 255) as f32 / 255.0;
                         let g = ((entity_id * 100) % 255) as f32 / 255.0;
                         let b = ((entity_id * 150) % 255) as f32 / 255.0;
                         gl.uniform_3_f32(gl.get_uniform_location(program, "u_color").as_ref(), r, g, b);
                         
-                        gl.bind_vertex_array(Some(cube_vao));
-                        gl.draw_arrays(glow::TRIANGLES, 0, cube_vertex_count);
+                        gl.bind_vertex_array(Some(mesh_vao));
+                        gl.draw_elements(glow::TRIANGLES, index_count, glow::UNSIGNED_INT, 0);
                     }
                     
                     gl.disable(glow::DEPTH_TEST);

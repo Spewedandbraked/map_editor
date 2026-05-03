@@ -50,7 +50,6 @@ impl SceneGraph {
         self.entities.iter().find(|e| e.id == id)
     }
 
-    #[allow(dead_code)]
     pub fn get_mut(&mut self, id: usize) -> Option<&mut SceneEntity> {
         self.entities.iter_mut().find(|e| e.id == id)
     }
