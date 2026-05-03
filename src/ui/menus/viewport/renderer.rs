@@ -2,18 +2,23 @@ use glow::HasContext;
 
 pub struct Renderer {
     pub program: glow::Program,
-    pub vao: glow::VertexArray,
-    pub vertex_count: i32,
+    pub grid_vao: glow::VertexArray,
+    pub grid_vertex_count: i32,
+    pub cube_vao: glow::VertexArray,
+    pub cube_vertex_count: i32,
 }
 
 impl Renderer {
     pub fn new(gl: &glow::Context) -> Self {
         let program = create_shader_program(gl);
-        let (vao, vertex_count) = create_grid_geometry(gl);
+        let (grid_vao, grid_vertex_count) = create_grid_geometry(gl);
+        let (cube_vao, cube_vertex_count) = create_cube_geometry(gl);
         Self {
             program,
-            vao,
-            vertex_count,
+            grid_vao,
+            grid_vertex_count,
+            cube_vao,
+            cube_vertex_count,
         }
     }
 }
@@ -29,9 +34,10 @@ fn create_shader_program(gl: &glow::Context) -> glow::Program {
     "#;
     let fragment_source = r#"
         #version 330 core
+        uniform vec3 u_color;
         out vec4 FragColor;
         void main() {
-            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            FragColor = vec4(u_color, 1.0);
         }
     "#;
     unsafe {
@@ -60,6 +66,43 @@ fn create_grid_geometry(gl: &glow::Context) -> (glow::VertexArray, i32) {
         vertices.extend_from_slice(&[-grid_size as f32, 0.0, i, grid_size as f32, 0.0, i]);
     }
     let vertex_count = (vertices.len() / 3) as i32;
+    unsafe {
+        let vao = gl.create_vertex_array().unwrap();
+        let vbo = gl.create_buffer().unwrap();
+        gl.bind_vertex_array(Some(vao));
+        gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
+        gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&vertices), glow::STATIC_DRAW);
+        gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, 12, 0);
+        gl.enable_vertex_attrib_array(0);
+        gl.bind_vertex_array(None);
+        (vao, vertex_count)
+    }
+}
+
+fn create_cube_geometry(gl: &glow::Context) -> (glow::VertexArray, i32) {
+    // Вершины куба (12 треугольников = 36 вершин)
+    let vertices: Vec<f32> = vec![
+        // Передняя грань
+        -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,   0.5,  0.5,  0.5,
+        -0.5, -0.5,  0.5,   0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,
+        // Задняя грань
+        -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5,  0.5, -0.5,
+        -0.5, -0.5, -0.5,   0.5,  0.5, -0.5,  -0.5,  0.5, -0.5,
+        // Верхняя грань
+        -0.5,  0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
+        -0.5,  0.5, -0.5,   0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,
+        // Нижняя грань
+        -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5, -0.5,  0.5,
+        -0.5, -0.5, -0.5,   0.5, -0.5,  0.5,  -0.5, -0.5,  0.5,
+        // Левая грань
+        -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,
+        -0.5, -0.5, -0.5,  -0.5,  0.5,  0.5,  -0.5, -0.5,  0.5,
+        // Правая грань
+        0.5, -0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
+        0.5, -0.5, -0.5,   0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
+    ];
+    let vertex_count = (vertices.len() / 3) as i32;
+    
     unsafe {
         let vao = gl.create_vertex_array().unwrap();
         let vbo = gl.create_buffer().unwrap();

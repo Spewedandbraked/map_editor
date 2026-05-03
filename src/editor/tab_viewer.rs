@@ -35,7 +35,7 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
             Tab::Viewport3D(id) => {
                 if let Some(state) = self.viewports.get_mut(id) {
                     if let Some(gl) = self.gl.as_ref() {
-                        window::show_viewport(ui, state, gl);
+                        window::show_viewport(ui, state, gl, self.scene_manager);
                     }
                 }
             }

@@ -8,6 +8,7 @@ use glam::Vec3;
 use self::camera::Camera;
 use self::renderer::Renderer;
 use glow::HasContext;
+use crate::editor::scene_manager::SceneManager;
 
 const MOVE_SPEED: f32 = 0.1;
 
@@ -30,7 +31,7 @@ impl Viewport3DState {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, _gl: &glow::Context) {
+    pub fn ui(&mut self, ui: &mut egui::Ui, _gl: &glow::Context, scene_manager: &mut SceneManager) {
         let available_size = ui.available_size();
         let width = available_size.x.round() as i32;
         let height = available_size.y.round() as i32;
@@ -46,12 +47,22 @@ impl Viewport3DState {
         );
 
         let program = self.renderer.program;
-        let vao = self.renderer.vao;
-        let vertex_count = self.renderer.vertex_count;
+        let grid_vao = self.renderer.grid_vao;
+        let cube_vao = self.renderer.cube_vao;
+        let grid_vertex_count = self.renderer.grid_vertex_count;
+        let cube_vertex_count = self.renderer.cube_vertex_count;
         let rotation = self.camera.rotation;
         let distance = self.camera.distance;
         let target = self.camera.target;
         let size = self.size;
+        
+        // Собираем данные о сущностях для рендера (позиция и цвет)
+        let entities: Vec<(Vec3, glam::Quat, Vec3, usize)> = scene_manager
+            .scene_graph()
+            .entities
+            .iter()
+            .map(|e| (e.translation, e.rotation, e.scale, e.id))
+            .collect();
 
         let cb = egui::PaintCallback {
             rect,
@@ -72,17 +83,43 @@ impl Viewport3DState {
                         0.1,
                         100.0,
                     );
-                    let mvp = proj * view;
-
+                    
+                    // 1. Рендер сетки (grid)
+                    let grid_mvp = proj * view;
                     gl.uniform_matrix_4_f32_slice(
                         gl.get_uniform_location(program, "u_mvp").as_ref(),
                         false,
-                        &mvp.to_cols_array(),
+                        &grid_mvp.to_cols_array(),
                     );
-
-                    gl.bind_vertex_array(Some(vao));
-                    gl.draw_arrays(glow::LINES, 0, vertex_count);
-
+                    // Белый цвет для сетки
+                    gl.uniform_3_f32(gl.get_uniform_location(program, "u_color").as_ref(), 0.5, 0.5, 0.5);
+                    gl.bind_vertex_array(Some(grid_vao));
+                    gl.draw_arrays(glow::LINES, 0, grid_vertex_count);
+                    
+                    // 2. Рендер каждой сущности (куб)
+                    for (entity_pos, entity_rot, entity_scale, entity_id) in &entities {
+                        // Строим MVP матрицу для каждой сущности
+                        let model = glam::Mat4::from_translation(*entity_pos)
+                            * glam::Mat4::from_quat(*entity_rot)
+                            * glam::Mat4::from_scale(*entity_scale);
+                        let mvp = proj * view * model;
+                        
+                        gl.uniform_matrix_4_f32_slice(
+                            gl.get_uniform_location(program, "u_mvp").as_ref(),
+                            false,
+                            &mvp.to_cols_array(),
+                        );
+                        
+                        // Разные цвета для разных сущностей (на основе ID)
+                        let r = ((entity_id * 50) % 255) as f32 / 255.0;
+                        let g = ((entity_id * 100) % 255) as f32 / 255.0;
+                        let b = ((entity_id * 150) % 255) as f32 / 255.0;
+                        gl.uniform_3_f32(gl.get_uniform_location(program, "u_color").as_ref(), r, g, b);
+                        
+                        gl.bind_vertex_array(Some(cube_vao));
+                        gl.draw_arrays(glow::TRIANGLES, 0, cube_vertex_count);
+                    }
+                    
                     gl.disable(glow::DEPTH_TEST);
                 }
             })),

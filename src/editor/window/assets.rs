@@ -52,20 +52,35 @@ pub fn show_assets(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
                             let asset_id = scene_manager.asset_registry_mut().add_asset(path, None);
                             println!("✅ Asset added: {}", asset_id);
                         }
-                        ui.close(); // Исправлено: close() вместо close_menu()
+                        ui.close();
                     }
                 });
             })
         });
 
-    // Простой список ассетов
-    let assets = scene_manager.asset_registry().all_assets();
+    // Список ассетов с кнопкой добавления в сцену
+    // Сначала собираем ID ассетов, чтобы избежать проблем с заимствованием
+    let assets: Vec<(String, String)> = scene_manager
+        .asset_registry()
+        .all_assets()
+        .iter()
+        .map(|a| (a.id.clone(), a.name.clone()))
+        .collect();
 
     if assets.is_empty() {
         ui.label("No assets loaded.");
     } else {
-        for asset in assets {
-            ui.label(format!("{} - {}", asset.name, asset.path.display()));
+        for (asset_id, asset_name) in assets {
+            ui.horizontal(|ui| {
+                ui.label(format!("{}", asset_name));
+                
+                // Кнопка для добавления ассета в сцену
+                if ui.button("➕ Add to Scene").clicked() {
+                    let entity_name = format!("{}_entity", asset_name);
+                    let entity_id = scene_manager.scene_graph_mut().add_entity(entity_name, asset_id.clone());
+                    println!("✅ Entity added: {} (id: {})", asset_name, entity_id);
+                }
+            });
         }
     }
 }

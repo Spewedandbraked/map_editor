@@ -28,6 +28,10 @@ impl SceneManager {
         &self.scene_graph
     }
 
+    pub fn scene_graph_mut(&mut self) -> &mut SceneGraph {
+        &mut self.scene_graph
+    }
+
     pub fn asset_registry(&self) -> &AssetRegistry {
         &self.asset_registry
     }
