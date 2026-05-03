@@ -33,30 +33,82 @@ impl PanelWindow for PropertiesWindow {
 }
 
 // Функция отображения содержимого
-pub fn show_properties(ui: &mut egui::Ui, scene_manager: &SceneManager) {
-    let scene_graph = scene_manager.scene_graph();
+pub fn show_properties(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
     if let Some(id) = scene_manager.selected_entity_id() {
-        if let Some(entity) = scene_graph.get(id) {
-            ui.label(format!("Name: {}", entity.name));
-            ui.label(format!("Asset: {}", entity.asset_id));
-            ui.label(format!(
-                "Position: ({:.2}, {:.2}, {:.2})",
-                entity.translation.x, entity.translation.y, entity.translation.z
-            ));
-            ui.label(format!(
-                "Rotation: ({:.2}, {:.2}, {:.2})",
-                entity.rotation.to_euler(glam::EulerRot::XYZ).0,
-                entity.rotation.to_euler(glam::EulerRot::XYZ).1,
-                entity.rotation.to_euler(glam::EulerRot::XYZ).2
-            ));
-            ui.label(format!(
-                "Scale: ({:.2}, {:.2}, {:.2})",
-                entity.scale.x, entity.scale.y, entity.scale.z
-            ));
+        // Пытаемся получить мутабельную ссылку на сущность
+        if let Some(entity) = scene_manager.scene_graph_mut().get_mut(id) {
+            ui.heading(format!("Entity: {}", entity.name));
+            ui.separator();
+            
+            // Секция Name (только для просмотра)
+            ui.label("Name:");
+            ui.label(&entity.name);
+            
+            ui.separator();
+            
+            // Секция Asset
+            ui.label("Asset ID:");
+            ui.label(&entity.asset_id);
+            
+            ui.separator();
+            
+            // Секция Position (редактируемая)
+            ui.label("Position:");
+            let mut translation = entity.translation;
+            
+            // Создаём изменяемые переменные для каждого поля
+            let mut x = translation.x;
+            let mut y = translation.y;
+            let mut z = translation.z;
+            
+            ui.horizontal(|ui| {
+                ui.label("X:");
+                if ui.add(egui::DragValue::new(&mut x).speed(0.1).prefix("X: ")).changed() {
+                    translation.x = x;
+                }
+            });
+            
+            ui.horizontal(|ui| {
+                ui.label("Y:");
+                if ui.add(egui::DragValue::new(&mut y).speed(0.1).prefix("Y: ")).changed() {
+                    translation.y = y;
+                }
+            });
+            
+            ui.horizontal(|ui| {
+                ui.label("Z:");
+                if ui.add(egui::DragValue::new(&mut z).speed(0.1).prefix("Z: ")).changed() {
+                    translation.z = z;
+                }
+            });
+            
+            // Применяем изменения
+            if translation != entity.translation {
+                entity.translation = translation;
+                println!("Entity {} moved to: ({:.2}, {:.2}, {:.2})", id, translation.x, translation.y, translation.z);
+            }
+            
+            ui.separator();
+            
+            // Секция Rotation (пока только для просмотра)
+            ui.label("Rotation (Euler):");
+            let euler = entity.rotation.to_euler(glam::EulerRot::XYZ);
+            ui.label(format!("X: {:.2}°, Y: {:.2}°, Z: {:.2}°", 
+                euler.0.to_degrees(), 
+                euler.1.to_degrees(), 
+                euler.2.to_degrees()));
+            
+            ui.separator();
+            
+            // Секция Scale (пока только для просмотра)
+            ui.label("Scale:");
+            ui.label(format!("X: {:.2}, Y: {:.2}, Z: {:.2}", 
+                entity.scale.x, entity.scale.y, entity.scale.z));
+            
         } else {
             ui.label("Selected entity not found");
         }
     } else {
-        ui.label("No entity selected");
+        ui.label("No entity selected. Click on an entity in Scene Graph to edit its properties.");
     }
 }
