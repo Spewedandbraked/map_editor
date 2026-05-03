@@ -60,6 +60,7 @@ impl AssetRegistry {
         self.assets.values().collect()
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.assets.len()
     }

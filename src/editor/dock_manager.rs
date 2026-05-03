@@ -1,5 +1,11 @@
 use egui_dock::DockState;
-use crate::editor::window::{PanelWindow, tools::ToolsWindow, scene_graph::SceneGraphWindow, properties::PropertiesWindow, assets::AssetsWindow};
+use crate::editor::window::PanelWindow;
+
+// Импортируем структуры окон (они остались в файлах как struct)
+use crate::editor::window::tools::ToolsWindow;
+use crate::editor::window::scene_graph::SceneGraphWindow;
+use crate::editor::window::properties::PropertiesWindow;
+use crate::editor::window::assets::AssetsWindow;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tab {
@@ -7,7 +13,7 @@ pub enum Tab {
     SceneGraph,
     Properties,
     Tools,
-    Assets,  // Новая вкладка для ассетов
+    Assets,
 }
 
 pub struct DockManager {
@@ -15,7 +21,7 @@ pub struct DockManager {
     pub tools: ToolsWindow,
     pub scene_graph: SceneGraphWindow,
     pub properties: PropertiesWindow,
-    pub assets: AssetsWindow,  // Новое окно
+    pub assets: AssetsWindow,
 }
 
 impl DockManager {
@@ -25,7 +31,7 @@ impl DockManager {
             tools: ToolsWindow::new(),
             scene_graph: SceneGraphWindow::new(),
             properties: PropertiesWindow::new(),
-            assets: AssetsWindow::new(),  // Создаём новое окно
+            assets: AssetsWindow::new(),
         }
     }
 
@@ -53,7 +59,7 @@ impl DockManager {
         self.properties.toggle(&mut self.dock_state);
     }
 
-    pub fn toggle_assets(&mut self) {  // Новый метод
+    pub fn toggle_assets(&mut self) {
         self.assets.toggle(&mut self.dock_state);
     }
 
@@ -73,7 +79,7 @@ impl DockManager {
         self.properties.on_close();
     }
 
-    pub fn on_close_assets(&mut self) {  // Новый метод
+    pub fn on_close_assets(&mut self) {
         self.assets.on_close();
     }
 }

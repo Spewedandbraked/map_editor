@@ -1,7 +1,10 @@
 use egui_dock::DockState;
+use eframe::egui;
 use super::PanelWindow;
 use crate::editor::dock_manager::Tab;
+use crate::editor::scene_manager::SceneManager;
 
+// Структура окна
 pub struct SceneGraphWindow {
     pub open: bool,
 }
@@ -26,5 +29,31 @@ impl PanelWindow for SceneGraphWindow {
 
     fn on_close(&mut self) {
         self.open = false;
+    }
+}
+
+// Функция отображения содержимого
+pub fn show_scene_graph(ui: &mut egui::Ui, scene_manager: &mut SceneManager) {
+    ui.label("Scene Graph");
+    let items: Vec<(usize, String)> = {
+        let scene_graph = scene_manager.scene_graph();
+        scene_graph
+            .entities
+            .iter()
+            .map(|e| (e.id, format!("{} ({})", e.name, e.asset_id)))
+            .collect()
+    };
+    let selected_id = scene_manager.selected_entity_id();
+    let mut new_selection = selected_id;
+    for (id, label) in &items {
+        let response = ui.selectable_label(selected_id == Some(*id), label);
+        if response.clicked() {
+            new_selection = Some(*id);
+        }
+    }
+    if new_selection != selected_id {
+        if let Some(id) = new_selection {
+            scene_manager.select_entity(id);
+        }
     }
 }

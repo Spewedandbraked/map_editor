@@ -1,7 +1,10 @@
 use egui_dock::DockState;
+use eframe::egui;
 use super::PanelWindow;
 use crate::editor::dock_manager::Tab;
+use crate::editor::scene_manager::SceneManager;
 
+// Структура окна (для управления открытием/закрытием)
 pub struct ToolsWindow {
     pub open: bool,
 }
@@ -26,5 +29,19 @@ impl PanelWindow for ToolsWindow {
 
     fn on_close(&mut self) {
         self.open = false;
+    }
+}
+
+// Функция отображения содержимого окна
+pub fn show_tools(ui: &mut egui::Ui, scene_manager: &SceneManager) {
+    ui.label("Project Asset Storage");
+    let asset_registry = scene_manager.asset_registry();
+    let scene_graph = scene_manager.scene_graph();
+    for entity in &scene_graph.entities {
+        let path = asset_registry
+            .path(&entity.asset_id)
+            .map(|p| p.display().to_string())
+            .unwrap_or("N/A".to_string());
+        ui.label(format!("{} -> {}", entity.name, path));
     }
 }
